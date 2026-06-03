@@ -109,6 +109,69 @@ AdvancePlaywrightFramework1x/
 
 ---
 
+## 📊 Latest Execution Report
+
+The framework generates detailed TTA-branded reports after every run.
+
+- **Main Dashboard:** [`tta-report/index.html`](tta-report/index.html)
+- **Latest Run:** `report_20260603_071257.html` (Generated on 2026-06-03)
+
+---
+
+## 🏗️ Framework Architecture
+
+The framework follows a layered architecture to separate test intent from implementation details.
+
+### High-Level Flow
+```mermaid
+graph TD
+    T[Tests .spec.ts] --> POM[Page Objects]
+    POM --> UEL[UtilElementLocator]
+    UEL --> PW[Playwright Engine]
+    
+    T --> DG[DataGenerator]
+    DG --> F[Faker JS]
+    
+    T --> L[Winston Logger]
+    POM --> L
+    UEL --> L
+```
+
+### Component Breakdown
+
+1. **Tests (`src/tests/`)**: Define the "what". They use Page Objects and Data Generators to execute business scenarios.
+2. **Page Objects (`src/pages/`)**: Define the "where". They encapsulate page-specific locators and complex actions (e.g., `loginAs`).
+3. **UtilElementLocator (`src/utils/UtilElementLocator.ts`)**: The "how". A wrapper around Playwright's `Locator` that adds:
+   - Consistent timeouts
+   - Integrated logging for every action
+   - Simplified API for common interactions
+4. **DataGenerator (`src/utils/DataGenerator.ts`)**: Ensures tests use dynamic, realistic data via `@faker-js/faker`.
+5. **Logger (`src/utils/logger.ts`)**: Provides scoped logging (e.g., `[LoginPage] clicked login button`) for easier debugging.
+
+### Interaction Sequence
+Example: Performing a Login
+```mermaid
+sequenceDiagram
+    participant T as Test Spec
+    participant P as Page Object
+    participant U as UtilElementLocator
+    participant B as Browser
+    
+    T->>P: loginAs(user, pass)
+    P->>U: fill(usernameField, user)
+    U->>B: locator.fill()
+    P->>U: fill(passwordField, pass)
+    U->>B: locator.fill()
+    P->>U: click(loginButton)
+    U->>B: locator.click()
+    U-->>P: Action Complete
+    P-->>T: Login Flow Finished
+```
+
+---
+
+---
+
 ## Quick Start
 
 ### Prerequisites
