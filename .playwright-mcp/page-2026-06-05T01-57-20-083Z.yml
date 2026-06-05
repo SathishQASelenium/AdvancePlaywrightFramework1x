@@ -1,0 +1,58 @@
+- generic [active] [ref=e1]:
+  - complementary [ref=e2]:
+    - button "Close menu" [ref=e3] [cursor=pointer]: ×
+    - link "All Items" [ref=e4] [cursor=pointer]:
+      - /url: ./inventory.html
+    - link "About" [ref=e5] [cursor=pointer]:
+      - /url: https://app.thetestingacademy.com/
+    - link "Logout" [ref=e6] [cursor=pointer]:
+      - /url: "#"
+    - link "Reset App State" [ref=e7] [cursor=pointer]:
+      - /url: "#"
+  - banner [ref=e8]:
+    - button "Open menu" [ref=e9] [cursor=pointer]:
+      - img [ref=e10]
+    - generic [ref=e12]: TTACart
+    - link "Shopping cart" [ref=e13] [cursor=pointer]:
+      - /url: ./cart.html
+      - img [ref=e14]
+      - generic [ref=e18]: "1"
+  - generic [ref=e20]: Your Cart
+  - main [ref=e21]:
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]: QTY
+        - generic [ref=e26]: Description
+      - generic [ref=e27]:
+        - generic [ref=e29]: "1"
+        - generic [ref=e30]:
+          - link "Test.allTheThings() T-Shirt (Red)" [ref=e31] [cursor=pointer]:
+            - /url: ./inventory-item.html?id=test-allthethings-tshirt-red
+          - generic [ref=e32]: This classic TTA t-shirt is perfect to wear when cozying up to your keyboard to automate a few tests. Super-soft and comfy ringspun combed cotton.
+          - generic [ref=e33]: $15.99
+        - button "Remove" [ref=e35] [cursor=pointer]
+      - generic [ref=e36]:
+        - link "Continue Shopping" [ref=e37] [cursor=pointer]:
+          - /url: ./inventory.html
+          - img [ref=e38]
+          - text: Continue Shopping
+        - link "Checkout" [ref=e40] [cursor=pointer]:
+          - /url: ./checkout-step-one.html
+  - contentinfo [ref=e42]:
+    - generic [ref=e43]:
+      - link "Twitter" [ref=e44] [cursor=pointer]:
+        - /url: https://twitter.com/TheTestingAcad
+        - img [ref=e45]
+      - link "Facebook" [ref=e47] [cursor=pointer]:
+        - /url: https://facebook.com/
+        - img [ref=e48]
+      - link "LinkedIn" [ref=e50] [cursor=pointer]:
+        - /url: https://linkedin.com/
+        - img [ref=e51]
+    - generic [ref=e53]:
+      - text: (c) 2026 TTACart - The Testing Academy. All Rights Reserved.
+      - link "Terms of Service" [ref=e54] [cursor=pointer]:
+        - /url: https://app.thetestingacademy.com/
+      - text: "|"
+      - link "Privacy Policy" [ref=e55] [cursor=pointer]:
+        - /url: https://app.thetestingacademy.com/

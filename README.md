@@ -35,7 +35,9 @@ A complete, opinionated, batteries-included Playwright framework with **Page Obj
 - **Playwright Test runner** — parallel, retries, projects, trace viewer
 - **TypeScript strict mode** with path aliases (`@pages`, `@utils`, `@api`, …)
 - **Page Object Model** under `src/pages/`
-- **Custom Fixtures** under `src/fixtures/`
+- **Custom Fixtures** under `src/fixtures/` — avoids manual POM instantiation in specs
+- **Centralized Config** under `src/config/` — manages environment credentials
+- **Visual Step Utility** under `src/utils/visualStep.ts` — automatic screenshots for TTA reports
 - **API client layer** under `src/api/` (REST + GraphQL ready)
 - **Multi-env config** via `dotenv` — qa, stg, prod, dev
 - **Data-driven testing** — CSV (`csv-parse`), JSON, XLSX (`xlsx`)

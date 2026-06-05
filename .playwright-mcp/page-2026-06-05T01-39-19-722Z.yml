@@ -1,0 +1,117 @@
+- generic [active] [ref=e1]:
+  - complementary [ref=e2]:
+    - button "Close menu" [ref=e3] [cursor=pointer]: ×
+    - link "All Items" [ref=e4] [cursor=pointer]:
+      - /url: ./inventory.html
+    - link "About" [ref=e5] [cursor=pointer]:
+      - /url: https://app.thetestingacademy.com/
+    - link "Logout" [ref=e6] [cursor=pointer]:
+      - /url: "#"
+    - link "Reset App State" [ref=e7] [cursor=pointer]:
+      - /url: "#"
+  - banner [ref=e8]:
+    - button "Open menu" [ref=e9] [cursor=pointer]:
+      - img [ref=e10]
+    - generic [ref=e12]: TTACart
+    - link "Shopping cart" [ref=e13] [cursor=pointer]:
+      - /url: ./cart.html
+      - img [ref=e14]
+      - generic [ref=e125]: "1"
+  - generic [ref=e18]:
+    - generic [ref=e19]: Products
+    - generic [ref=e20]:
+      - img [ref=e21]
+      - combobox "Sort products" [ref=e23] [cursor=pointer]:
+        - option "Name (A to Z)" [selected]
+        - option "Name (Z to A)"
+        - option "Price (low to high)"
+        - option "Price (high to low)"
+  - main [ref=e24]:
+    - generic [ref=e26]:
+      - article [ref=e126]:
+        - link [ref=e127] [cursor=pointer]:
+          - /url: ./inventory-item.html?id=test-allthethings-tshirt-red
+          - img [ref=e128]:
+            - generic [ref=e130]: test.
+            - generic [ref=e131]: all()
+        - generic [ref=e132]:
+          - link "Test.allTheThings() T-Shirt (Red)" [ref=e134] [cursor=pointer]:
+            - /url: ./inventory-item.html?id=test-allthethings-tshirt-red
+          - generic [ref=e135]: This classic TTA t-shirt is perfect to wear when cozying up to your keyboard to automate a few tests. Super-soft and comfy ringspun combed cotton.
+          - generic [ref=e136]:
+            - generic [ref=e137]: $15.99
+            - button "Remove" [ref=e138] [cursor=pointer]
+      - article [ref=e139]:
+        - link [ref=e140] [cursor=pointer]:
+          - /url: ./inventory-item.html?id=tta-bike-light
+          - img [ref=e141]
+        - generic [ref=e147]:
+          - link "TTA Bike Light" [ref=e149] [cursor=pointer]:
+            - /url: ./inventory-item.html?id=tta-bike-light
+          - generic [ref=e150]: A red light isn't the desired state in testing but it sure helps when riding your bike at night. Water-resistant with 3 lighting modes, 1 AAA battery included.
+          - generic [ref=e151]:
+            - generic [ref=e152]: $9.99
+            - button "Add to cart" [ref=e153] [cursor=pointer]
+      - article [ref=e154]:
+        - link [ref=e155] [cursor=pointer]:
+          - /url: ./inventory-item.html?id=tta-bolt-tshirt
+          - img [ref=e156]
+        - generic [ref=e159]:
+          - link "TTA Bolt T-Shirt" [ref=e161] [cursor=pointer]:
+            - /url: ./inventory-item.html?id=tta-bolt-tshirt
+          - generic [ref=e162]: Get your testing superhero on with the TTA bolt T-shirt. From American Apparel, 100% ringspun combed cotton, heather gray with red bolt.
+          - generic [ref=e163]:
+            - generic [ref=e164]: $15.99
+            - button "Add to cart" [ref=e165] [cursor=pointer]
+      - article [ref=e166]:
+        - link [ref=e167] [cursor=pointer]:
+          - /url: ./inventory-item.html?id=tta-fleece-jacket
+          - img [ref=e168]
+        - generic [ref=e174]:
+          - link "TTA Fleece Jacket" [ref=e176] [cursor=pointer]:
+            - /url: ./inventory-item.html?id=tta-fleece-jacket
+          - generic [ref=e177]: It's not every day that you come across a midweight quarter-zip fleece jacket capable of handling everything from a relaxing day outdoors to a busy day at the office.
+          - generic [ref=e178]:
+            - generic [ref=e179]: $49.99
+            - button "Add to cart" [ref=e180] [cursor=pointer]
+      - article [ref=e181]:
+        - link [ref=e182] [cursor=pointer]:
+          - /url: ./inventory-item.html?id=tta-junior-tester-onesie
+          - img [ref=e183]:
+            - generic [ref=e187]: JR
+        - generic [ref=e188]:
+          - link "TTA Junior Tester Onesie" [ref=e190] [cursor=pointer]:
+            - /url: ./inventory-item.html?id=tta-junior-tester-onesie
+          - generic [ref=e191]: Rib snap infant onesie for the junior automation engineer in development. Reinforced 3-snap bottom closure, two-needle hemmed sleeved and bottom won't unravel.
+          - generic [ref=e192]:
+            - generic [ref=e193]: $7.99
+            - button "Add to cart" [ref=e194] [cursor=pointer]
+      - article [ref=e195]:
+        - link [ref=e196] [cursor=pointer]:
+          - /url: ./inventory-item.html?id=tta-practice-backpack
+          - img [ref=e197]
+        - generic [ref=e202]:
+          - link "TTA Practice Backpack" [ref=e204] [cursor=pointer]:
+            - /url: ./inventory-item.html?id=tta-practice-backpack
+          - generic [ref=e205]: carry.allTheThings() with the sleek, streamlined Sly Pack that melds uncompromising style with unequaled laptop and tablet protection.
+          - generic [ref=e206]:
+            - generic [ref=e207]: $29.99
+            - button "Add to cart" [ref=e208] [cursor=pointer]
+  - contentinfo [ref=e111]:
+    - generic [ref=e112]:
+      - link "Twitter" [ref=e113] [cursor=pointer]:
+        - /url: https://twitter.com/TheTestingAcad
+        - img [ref=e114]
+      - link "Facebook" [ref=e116] [cursor=pointer]:
+        - /url: https://facebook.com/
+        - img [ref=e117]
+      - link "LinkedIn" [ref=e119] [cursor=pointer]:
+        - /url: https://linkedin.com/
+        - img [ref=e120]
+    - generic [ref=e122]:
+      - text: (c) 2026 TTACart - The Testing Academy. All Rights Reserved.
+      - link "Terms of Service" [ref=e123] [cursor=pointer]:
+        - /url: https://app.thetestingacademy.com/
+      - text: "|"
+      - link "Privacy Policy" [ref=e124] [cursor=pointer]:
+        - /url: https://app.thetestingacademy.com/
