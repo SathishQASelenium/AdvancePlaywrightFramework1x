@@ -24,6 +24,7 @@ A complete, opinionated, batteries-included Playwright framework with **Page Obj
 - [Reporting](#reporting)
 - [AI Agent Rules](#ai-agent-rules)
 - [Project Rules](#project-rules)
+- [CI/CD Integration (Jenkins)](#ci-cd-integration-jenkins)
 - [Phase 1 Walkthrough](#phase-1-walkthrough)
 - [Contributing](#contributing)
 - [Author](#author)
@@ -354,6 +355,32 @@ Canonical source: [`rules/`](./rules/).
 | Rule | When it applies |
 |------|-----------------|
 | [test-quality-checks.md](./rules/test-quality-checks.md) | Any change under `src/tests/**` |
+
+---
+
+## CI/CD Integration (Jenkins)
+
+The framework is configured for execution on local Jenkins instances.
+
+### Setup Steps
+1. **Install Node.js**: Install Node.js on Jenkins and map the latest version in **Global Tool Configuration**.
+2. **Build Step**: Use `Execute Windows batch command` with the following configuration:
+   ```batch
+   set CI=true
+   set STANDARD_USER=standard_user
+   set TTA_SECRET=tta_secret
+   call npm ci --audit=false
+   call npx playwright install chromium
+   call npx playwright test src/tests/login.spec.ts src/tests/e2e-checkout.spec.ts --project=chromium
+   ```
+3. **CSS Fix for Reports**: To ensure reports display correctly, add this system property to Jenkins:
+   `System.setProperty("hudson.model.DirectoryBrowserSupport.CSP", "sandbox allow-scripts allow-same-origin; default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data;;")`
+
+### Execution Proof
+Successful execution on local Jenkins:
+
+![Jenkins Build Success 1](docs/images/Jenkins_Build_Success_1.png)
+![Jenkins Build Success 2](docs/images/Jenkins_Build_Success_2.png)
 
 ---
 
