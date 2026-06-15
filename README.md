@@ -7,7 +7,7 @@
 [![Node](https://img.shields.io/badge/Node-18+-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
 [![License](https://img.shields.io/badge/License-ISC-blue.svg)]()
 
-A complete, opinionated, batteries-included Playwright framework with **Page Object Model**, **fixtures**, **data-driven testing**, **multi-env config**, **Winston logging**, a **custom HTML reporter**, **Allure**, and **CI-ready scripts**.
+A complete, opinionated, batteries-included Playwright framework with **Page Object Model**, **fixtures**, **data-driven testing**, **multi-env config**, **API testing**, **Winston logging**, a **custom HTML reporter**, **Allure**, and **CI-ready scripts**.
 
 ---
 
@@ -20,11 +20,13 @@ A complete, opinionated, batteries-included Playwright framework with **Page Obj
 - [Path Aliases](#path-aliases)
 - [Environment Configuration](#environment-configuration)
 - [Test Tags & Filtering](#test-tags--filtering)
+- [API Testing](#api-testing)
 - [Logging (Winston)](#logging-winston)
 - [Reporting](#reporting)
+- [Framework Architecture](#framework-architecture)
 - [AI Agent Rules](#ai-agent-rules)
 - [Project Rules](#project-rules)
-- [CI/CD Integration (Jenkins)](#ci-cd-integration-jenkins)
+- [CI/CD Integration (Jenkins)](#cicd-integration-jenkins)
 - [Phase 1 Walkthrough](#phase-1-walkthrough)
 - [Contributing](#contributing)
 - [Author](#author)
@@ -35,19 +37,21 @@ A complete, opinionated, batteries-included Playwright framework with **Page Obj
 
 - **Playwright Test runner** — parallel, retries, projects, trace viewer
 - **TypeScript strict mode** with path aliases (`@pages`, `@utils`, `@api`, …)
-- **Page Object Model** under `src/pages/`
+- **Page Object Model** under `src/pages/` — 8 page classes covering full e-commerce checkout flow
 - **Custom Fixtures** under `src/fixtures/` — avoids manual POM instantiation in specs
 - **Centralized Config** under `src/config/` — manages environment credentials
+- **API Testing** — dedicated `apiTests/` suite using Playwright `APIRequestContext` (CRUD + PUT flows)
 - **Visual Step Utility** under `src/utils/visualStep.ts` — automatic screenshots for TTA reports
-- **API client layer** under `src/api/` (REST + GraphQL ready)
-- **Multi-env config** via `dotenv` — qa, stg, prod, dev
+- **Util Element Locator** under `src/utils/UtilElementLocator.ts` — consistent timeouts + integrated logging
+- **Data Generator** under `src/utils/DataGenerator.ts` — dynamic test data via `@faker-js/faker`
+- **Multi-env config** via `dotenv` — qa, stg, prod, dev, api
 - **Data-driven testing** — CSV (`csv-parse`), JSON, XLSX (`xlsx`)
-- **Test data factories** with `@faker-js/faker`
 - **Winston logger** with file + console + rotation
-- **Custom HTML Reporter** (`CustomReporter.ts`) — TTA-branded, real-time
-- **Allure** reporter integration
+- **Custom TTA HTML Reporter** (`CustomTTAReporter.ts`) — branded, real-time with screenshots + video
+- **Allure** reporter integration with environment info + failure categories
 - **Tag-based execution** — `@p0`, `@p1`, `@e2e`, `@smoke`, `@lor`
 - **Cross-browser** — Chromium, Firefox, WebKit, Mobile Chrome (Pixel 5)
+- **Dual Playwright projects** — `api` project (headless REST) + `chromium` project (UI)
 - **CI-aware config** — auto-tunes retries, workers, `forbidOnly`
 - **AI-agent rule files** for Claude Code, Copilot, Cursor, Windsurf, Augment, Antigravity, Aider, Codex, Jules
 - **ESLint + Prettier + tsc** quality gates enforced on every test change
@@ -62,17 +66,37 @@ AdvancePlaywrightFramework1x/
 ├── src/
 │   ├── api/                   # API clients (REST / GraphQL)
 │   ├── config/                # Env loaders, constants, URLs
-│   ├── fixtures/              # Playwright custom fixtures
+│   ├── fixtures/
+│   │   └── test-base.ts       # Custom Playwright fixtures
 │   ├── pages/                 # Page Object Model classes
+│   │   ├── BasePage.ts        # Base class all pages extend
+│   │   ├── LoginPage.ts
+│   │   ├── InventoryPage.ts
+│   │   ├── ItemDetailPage.ts
+│   │   ├── CartPage.ts
+│   │   ├── CheckoutStepOnePage.ts
+│   │   ├── CheckoutStepTwoPage.ts
+│   │   ├── CheckoutCompletePage.ts
+│   │   └── index.ts           # Barrel export
 │   ├── testdata/              # CSV / JSON / XLSX test data
-│   ├── tests/                 # Spec files (*.spec.ts)
+│   ├── tests/
+│   │   ├── apiTests/          # REST API test specs
+│   │   │   ├── crud.spec.ts         # Serial CRUD flow (auth → create → update)
+│   │   │   └── put_operation.spec.ts # PUT operation standalone test
+│   │   ├── e2e/               # End-to-end UI specs
+│   │   │   └── e2e-checkout.spec.ts  # Full checkout journey
+│   │   └── tests/             # Unit / integration specs
+│   │       ├── login.spec.ts
+│   │       └── example.spec.ts
 │   └── utils/                 # Helpers
-│       ├── logger.ts          # Winston logger
-│       └── CustomReporter.ts  # TTA HTML reporter
+│       ├── logger.ts              # Winston logger
+│       ├── CustomTTAReporter.ts   # TTA HTML reporter
+│       ├── UtilElementLocator.ts  # Playwright locator wrapper
+│       ├── DataGenerator.ts       # Faker-based test data factory
+│       └── visualStep.ts          # Auto-screenshot step utility
 │
 ├── docs/
-│   └── phase1/
-│       └── prompts.md         # Phase 1 conversation log
+│   └── images/                # Screenshots and docs assets
 │
 ├── rules/                     # Canonical project rules
 │   ├── README.md
@@ -89,7 +113,7 @@ AdvancePlaywrightFramework1x/
 │   ├── copilot-instructions.md
 │   └── workflows/             # GitHub Actions CI
 │
-├── .claude/                   # Claude Code config (optional)
+├── .claude/                   # Claude Code config
 ├── .cursor/rules/             # Cursor MDC rules
 ├── .windsurf/rules/           # Windsurf rules
 ├── .augment/rules/            # Augment Code rules
@@ -112,66 +136,17 @@ AdvancePlaywrightFramework1x/
 
 ---
 
-## 📊 Latest Execution Report
+## Latest Execution Report
 
-The framework generates detailed TTA-branded reports after every run.
+TTA custom HTML reporter generates a branded report after every run, showing test steps, screenshots, and video recordings inline.
 
-- **Main Dashboard:** [`tta-report/index.html`](tta-report/index.html)
-- **Latest Run:** `report_20260603_071257.html` (Generated on 2026-06-03)
+![TTA Automation Report](docs/images/TTA-Automation-Report-06-06-2026_11_26_PM.png)
 
----
-
-## 🏗️ Framework Architecture
-
-The framework follows a layered architecture to separate test intent from implementation details.
-
-### High-Level Flow
-```mermaid
-graph TD
-    T[Tests .spec.ts] --> POM[Page Objects]
-    POM --> UEL[UtilElementLocator]
-    UEL --> PW[Playwright Engine]
-    
-    T --> DG[DataGenerator]
-    DG --> F[Faker JS]
-    
-    T --> L[Winston Logger]
-    POM --> L
-    UEL --> L
-```
-
-### Component Breakdown
-
-1. **Tests (`src/tests/`)**: Define the "what". They use Page Objects and Data Generators to execute business scenarios.
-2. **Page Objects (`src/pages/`)**: Define the "where". They encapsulate page-specific locators and complex actions (e.g., `loginAs`).
-3. **UtilElementLocator (`src/utils/UtilElementLocator.ts`)**: The "how". A wrapper around Playwright's `Locator` that adds:
-   - Consistent timeouts
-   - Integrated logging for every action
-   - Simplified API for common interactions
-4. **DataGenerator (`src/utils/DataGenerator.ts`)**: Ensures tests use dynamic, realistic data via `@faker-js/faker`.
-5. **Logger (`src/utils/logger.ts`)**: Provides scoped logging (e.g., `[LoginPage] clicked login button`) for easier debugging.
-
-### Interaction Sequence
-Example: Performing a Login
-```mermaid
-sequenceDiagram
-    participant T as Test Spec
-    participant P as Page Object
-    participant U as UtilElementLocator
-    participant B as Browser
-    
-    T->>P: loginAs(user, pass)
-    P->>U: fill(usernameField, user)
-    U->>B: locator.fill()
-    P->>U: fill(passwordField, pass)
-    U->>B: locator.fill()
-    P->>U: click(loginButton)
-    U->>B: locator.click()
-    U-->>P: Action Complete
-    P-->>T: Login Flow Finished
-```
-
----
+- **100% pass rate** — 2/2 tests passed in 18s
+- **Inline screenshots** per step for the checkout flow
+- **Embedded video** recordings for every test
+- **Step-level timing** — start time, end time, duration per test step
+- **Report location:** `tta-report/index.html`
 
 ---
 
@@ -195,10 +170,14 @@ npx playwright install --with-deps
 ### Run tests
 
 ```bash
-npm test                  # all tests, all projects
-npm run test:chromium     # chromium only
-npm run test:ui           # UI mode (debug-friendly)
-npm run test:p0           # smoke / critical only
+npm test                          # all tests, all projects
+npm run test:chromium             # UI tests on chromium only
+npm run test:ui                   # UI mode (debug-friendly)
+npm run test:p0                   # smoke / critical only
+
+# API tests
+npx playwright test --project=api
+TTA_ENV=api npx playwright test --project=api
 ```
 
 ### View report
@@ -264,12 +243,13 @@ import { users } from '@testdata/users.json';
 Supported keys:
 
 ```dotenv
-TTA_ENV=qa                # qa | stg | prod | dev
+TTA_ENV=qa                # qa | stg | prod | dev | api
 BASE_URL=                 # override everything if set
 QA_BASE_URL=https://app.thetestingacademy.com
 STG_BASE_URL=https://stage.thetestingacademy.com
 PROD_BASE_URL=https://app.thetestingacademy.com
 DEV_BASE_URL=http://localhost:3000
+API_BASE_URL=https://restful-booker.herokuapp.com
 LOG_LEVEL=info            # winston log level
 TEST_ENV=UAT              # shown in TTA report
 TEST_AUTHOR=Pramod
@@ -278,6 +258,7 @@ TEST_AUTHOR=Pramod
 Switch env:
 ```bash
 TTA_ENV=stg npm test
+TTA_ENV=api npx playwright test --project=api
 ```
 
 ---
@@ -298,6 +279,57 @@ npm run test:e2e          # @e2e only
 npx playwright test --grep "@smoke"
 npx playwright test --grep-invert "@flaky"
 ```
+
+---
+
+## API Testing
+
+The framework includes a dedicated API testing suite under `src/tests/apiTests/` using Playwright's built-in `APIRequestContext`. Tests target the [Restful Booker](https://restful-booker.herokuapp.com) API.
+
+### Test Suites
+
+| File | Description |
+|------|-------------|
+| `crud.spec.ts` | Serial CRUD flow — auth token → create booking → update booking |
+| `put_operation.spec.ts` | Standalone PUT test — self-contained auth + create + update |
+
+### Playwright Config — `api` Project
+
+The `playwright.config.ts` defines a dedicated `api` project that targets only API specs:
+
+```ts
+projects: [
+  { name: 'api', testMatch: /src\/tests\/apiTests\/.*\.spec\.ts/ },
+  { name: 'chromium', testIgnore: /src\/tests\/apiTests\/.*\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
+]
+```
+
+### Run API tests
+
+```bash
+# All API tests
+npx playwright test --project=api
+
+# With API env resolved automatically
+TTA_ENV=api npx playwright test --project=api
+
+# Specific file
+npx playwright test src/tests/apiTests/crud.spec.ts --project=api
+```
+
+### CRUD Flow Example
+
+```ts
+test.describe.serial('Restful Booker CRUD API', () => {
+  const bookingFlowState: BookingFlowState = {};
+
+  test('TC#1 @p0 - Create token', async ({ request }) => { ... });
+  test('TC#2 @p0 - Create booking', async ({ request }) => { ... });
+  test('TC#3 @p0 - Update booking', async ({ request }) => { ... });
+});
+```
+
+`test.describe.serial` ensures shared state (`bookingFlowState`) flows across dependent tests in order.
 
 ---
 
@@ -328,6 +360,79 @@ Output:
 | JSON | `test-results/results.json` | auto |
 | Allure | `allure-results/` → `allure-report/` | `npm run test:allure` |
 | List (console) | stdout | auto |
+
+**Allure config** includes environment info (env name, base URL, Node version, OS, CI flag) and pre-wired failure categories: assertion failures, broken tests, and timeouts.
+
+---
+
+## Framework Architecture
+
+### High-Level Flow
+
+```mermaid
+graph TD
+    T[Tests .spec.ts] --> POM[Page Objects]
+    POM --> UEL[UtilElementLocator]
+    UEL --> PW[Playwright Engine]
+
+    T --> API[APIRequestContext]
+    API --> REST[REST Endpoints]
+
+    T --> DG[DataGenerator]
+    DG --> F[Faker JS]
+
+    T --> L[Winston Logger]
+    POM --> L
+    UEL --> L
+```
+
+### Component Breakdown
+
+1. **Tests (`src/tests/`)**: Define the "what". Organized into `e2e/`, `apiTests/`, and `tests/` subdirectories.
+2. **Page Objects (`src/pages/`)**: Define the "where". 8 page classes covering login → inventory → cart → checkout → complete.
+3. **UtilElementLocator (`src/utils/UtilElementLocator.ts`)**: The "how". Wraps Playwright `Locator` with consistent timeouts and integrated logging.
+4. **DataGenerator (`src/utils/DataGenerator.ts`)**: Dynamic, realistic test data via `@faker-js/faker`.
+5. **Logger (`src/utils/logger.ts`)**: Scoped logging (e.g., `[LoginPage] clicked login button`) for easier debugging.
+6. **CustomTTAReporter (`src/utils/CustomTTAReporter.ts`)**: TTA-branded HTML report with inline screenshots and video per test.
+
+### Interaction Sequence — UI Login
+
+```mermaid
+sequenceDiagram
+    participant T as Test Spec
+    participant P as Page Object
+    participant U as UtilElementLocator
+    participant B as Browser
+
+    T->>P: loginAs(user, pass)
+    P->>U: fill(usernameField, user)
+    U->>B: locator.fill()
+    P->>U: fill(passwordField, pass)
+    U->>B: locator.fill()
+    P->>U: click(loginButton)
+    U->>B: locator.click()
+    U-->>P: Action Complete
+    P-->>T: Login Flow Finished
+```
+
+### Interaction Sequence — API CRUD
+
+```mermaid
+sequenceDiagram
+    participant T as Test Spec (serial)
+    participant R as APIRequestContext
+    participant A as Restful Booker API
+
+    T->>R: POST /auth
+    R->>A: username + password
+    A-->>T: token
+    T->>R: POST /booking
+    R->>A: booking payload
+    A-->>T: bookingId
+    T->>R: PUT /booking/:id
+    R->>A: updated payload + Cookie token
+    A-->>T: 200 OK
+```
 
 ---
 
@@ -363,24 +468,37 @@ Canonical source: [`rules/`](./rules/).
 The framework is configured for execution on local Jenkins instances.
 
 ### Setup Steps
+
 1. **Install Node.js**: Install Node.js on Jenkins and map the latest version in **Global Tool Configuration**.
-2. **Build Step**: Use `Execute Windows batch command` with the following configuration:
-   ```batch
-   set CI=true
-   set STANDARD_USER=standard_user
-   set TTA_SECRET=tta_secret
-   call npm ci --audit=false
-   call npx playwright install chromium
-   call npx playwright test src/tests/login.spec.ts src/tests/e2e-checkout.spec.ts --project=chromium
-   ```
-3. **CSS Fix for Reports**: To ensure reports display correctly, add this system property to Jenkins:
+2. **Build Step**: Use `Execute Windows batch command`:
+
+```batch
+set CI=true
+set STANDARD_USER=standard_user
+set TTA_SECRET=tta_secret
+call npm ci --audit=false
+call npx playwright install chromium
+call npx playwright test src/tests/e2e/e2e-checkout.spec.ts src/tests/tests/login.spec.ts --project=chromium
+```
+
+3. **Run API tests in CI**:
+
+```batch
+set CI=true
+call npm ci --audit=false
+call npx playwright test --project=api
+```
+
+4. **CSS Fix for Reports**: Add this system property to Jenkins so reports display correctly:
    `System.setProperty("hudson.model.DirectoryBrowserSupport.CSP", "sandbox allow-scripts allow-same-origin; default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data;;")`
 
-### Execution Proof
-Successful execution on local Jenkins:
+### Jenkins Build Screenshots
 
-![Jenkins Build Success 1](docs/images/Jenkins_Build_Success_1.png)
-![Jenkins Build Success 2](docs/images/Jenkins_Build_Success_2.png)
+![Jenkins Node Setup](docs/images/Jenkins_2_WindowsBatchCommand_To_CheckNode_npm_Version.png)
+
+![Jenkins Build Success](docs/images/Jenkins_Build_Success_1.png)
+
+![Jenkins Build Console Output](docs/images/Jenkins_Build_Success_2.png)
 
 ---
 
