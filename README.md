@@ -331,6 +331,14 @@ test.describe.serial('Restful Booker CRUD API', () => {
 
 `test.describe.serial` ensures shared state (`bookingFlowState`) flows across dependent tests in order.
 
+### Latest API Test Run
+
+![API Tests Run](docs/images/API_Tests_Run_2026-06-15.png)
+
+- **4/4 passed** — `crud.spec.ts` (3 tests) + `put_operation.spec.ts` (1 test)
+- **Total time: 2.8s** — Project: `api`
+- **Run date:** 15 June 2026, 08:11 AM
+
 ---
 
 ## Logging (Winston)

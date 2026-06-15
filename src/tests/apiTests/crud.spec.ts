@@ -32,7 +32,7 @@ interface BookingFlowState {
 test.describe.serial('Restful Booker CRUD API', () => {
     const baseUrl = process.env.API_BASE_URL || 'https://restful-booker.herokuapp.com';
     const headers = {
-        Accept: 'application/json',
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
     };
     const bookingFlowState: BookingFlowState = {};

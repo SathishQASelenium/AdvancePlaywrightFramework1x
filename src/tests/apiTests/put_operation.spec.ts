@@ -5,7 +5,7 @@ test.describe('Restful Booker booking API', () => {
     test('TC#2 @p0 - PUT : Verify that update the existing booking is working fine.', async ({ request }) => {
         const baseUrl = process.env.API_BASE_URL || 'https://restful-booker.herokuapp.com';
         const headers = {
-            Accept: 'application/json',
+            'Accept': 'application/json',
             'Content-Type': 'application/json',
         };
         const payload = {
