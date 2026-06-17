@@ -81,8 +81,16 @@ AdvancePlaywrightFramework1x/
 │   ├── testdata/              # CSV / JSON / XLSX test data
 │   ├── tests/
 │   │   ├── apiTests/          # REST API test specs
-│   │   │   ├── crud.spec.ts         # Serial CRUD flow (auth → create → update)
-│   │   │   └── put_operation.spec.ts # PUT operation standalone test
+│   │   │   ├── 01_restfulbooker_raw/     # Level 1 — raw APIRequestContext
+│   │   │   │   ├── basic_Ping.spec.ts        # Simple GET health-check against /ping
+│   │   │   │   ├── curd_operation.spec.ts    # GET ping with full status + body assertion
+│   │   │   │   ├── post_operation.spec.ts    # POST booking flow with auth + test.step()
+│   │   │   │   ├── newContext_api.spec.ts    # Isolated context via request.newContext()
+│   │   │   │   ├── crud.spec.ts              # Serial CRUD flow (auth → create → update)
+│   │   │   │   └── put_operation.spec.ts     # PUT operation standalone test
+│   │   │   └── 02_restfulbooker_apiHelper/  # Level 2 — ApiHelper abstraction layer
+│   │   │       ├── create_Booking.spec.ts    # POST booking via ApiHelper + test.step()
+│   │   │       └── update_Booking.spec.ts    # PUT booking via ApiHelper + Cookie token
 │   │   ├── e2e/               # End-to-end UI specs
 │   │   │   └── e2e-checkout.spec.ts  # Full checkout journey
 │   │   └── tests/             # Unit / integration specs
@@ -288,10 +296,23 @@ The framework includes a dedicated API testing suite under `src/tests/apiTests/`
 
 ### Test Suites
 
+**Level 1 — `01_restfulbooker_raw/` (raw `APIRequestContext`)**
+
 | File | Description |
 |------|-------------|
+| `basic_Ping.spec.ts` | Simple GET `/ping` health-check — validates HTTP 201 response |
+| `curd_operation.spec.ts` | GET `/ping` with full assertion — status code + body text check |
+| `post_operation.spec.ts` | POST booking flow — auth token → create booking via `test.step()` |
+| `newContext_api.spec.ts` | Isolated API context via `request.newContext()` — custom headers, gorest.in |
 | `crud.spec.ts` | Serial CRUD flow — auth token → create booking → update booking |
 | `put_operation.spec.ts` | Standalone PUT test — self-contained auth + create + update |
+
+**Level 2 — `02_restfulbooker_apiHelper/` (`ApiHelper` abstraction)**
+
+| File | Description |
+|------|-------------|
+| `create_Booking.spec.ts` | POST `/booking` via `ApiHelper` — payload → response validation via `test.step()` |
+| `update_Booking.spec.ts` | PUT `/booking/{id}` via `ApiHelper` — auth → create → update → validate via `test.step()` |
 
 ### Playwright Config — `api` Project
 
@@ -338,6 +359,28 @@ test.describe.serial('Restful Booker CRUD API', () => {
 - **4/4 passed** — `crud.spec.ts` (3 tests) + `put_operation.spec.ts` (1 test)
 - **Total time: 2.8s** — Project: `api`
 - **Run date:** 15 June 2026, 08:11 AM
+
+### CRUD Operations — TTA Report
+
+TTA custom HTML reporter captures every API test step, request/response details, and step-level timing.
+
+![CRUD Operations TTA Report](docs/images/TTA-Automation-Report-06-17-2026_09_20_PM.png)
+
+- **Full CRUD coverage** — auth token → POST booking → PUT update in serial flow
+- **Step-level breakdown** — each `test.step()` recorded with start time, end time, and duration
+- **Report location:** `tta-report/index.html`
+- **Run date:** 17 June 2026, 09:20 PM
+
+### Level 2 ApiHelper — PUT Update Booking TTA Report
+
+`update_Booking.spec.ts` refactored with `ApiHelper` abstraction and 4 discrete `test.step()` blocks — all steps visible in TTA report with console log output per step.
+
+![Update Booking ApiHelper TTA Report](docs/images/TTA-Automation-Report-06-18-2026_12_03_AM.png)
+
+- **1/1 passed** — `update_Booking.spec.ts` via `ApiHelper` layer
+- **4 steps:** Create auth token (1309ms) → Create booking to update (296ms) → PUT update booking (296ms) → Validate updated booking response (8ms)
+- **Total duration:** 2s | **Pass rate:** 100%
+- **Run date:** 17 June 2026, 11:43 PM
 
 ---
 

@@ -75,7 +75,7 @@ export default defineConfig({
     },
   },
   projects: [
-    { name: 'api', testMatch: /src\/tests\/apiTests\/.*\.spec\.ts/, },
+    { name: 'api', testMatch: /src\/tests\/apiTests\/.*\.spec\.ts/, use: { baseURL: process.env.API_BASE_URL || 'https://restful-booker.herokuapp.com' } },
     { name: 'chromium', testIgnore: /src\/tests\/apiTests\/.*\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
     // { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     // { name: 'webkit', use: { ...devices['Desktop Safari'] } },
