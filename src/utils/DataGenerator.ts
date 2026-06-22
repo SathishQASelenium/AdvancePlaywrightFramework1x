@@ -6,8 +6,8 @@
  * centralises all random data so tests stay deterministic-friendly (one
  * import) and read naturally.
  *
- * Faker v10 API notes:
- *   - `faker.internet.username()` (NOT the old `userName`)
+ * Faker v8 API notes:
+ *   - `faker.internet.userName()` (camelCase)
  *   - `faker.location.zipCode()`  (NOT the old `address.zipCode`)
  */
 
@@ -35,7 +35,7 @@ export class DataGenerator {
 
     /** Random username, e.g. "Jaylen.Hahn42". */
     static username(): string {
-        return faker.internet.username();
+        return faker.internet.userName();
     }
 
     /**

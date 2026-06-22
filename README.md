@@ -1,6 +1,6 @@
 # Advance Playwright Framework (1.x)
 
-> Production-grade Playwright + TypeScript automation framework built by [Pramod Dutta](https://thetestingacademy.com) for **The Testing Academy**.
+> Production-grade Playwright + TypeScript automation framework built by **Sathish Kumar A S** for **The Testing Academy**.
 
 [![Playwright](https://img.shields.io/badge/Playwright-1.60-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
@@ -40,7 +40,7 @@ A complete, opinionated, batteries-included Playwright framework with **Page Obj
 - **Page Object Model** under `src/pages/` — 8 page classes covering full e-commerce checkout flow
 - **Custom Fixtures** under `src/fixtures/` — avoids manual POM instantiation in specs
 - **Centralized Config** under `src/config/` — manages environment credentials
-- **API Testing** — dedicated `apiTests/` suite using Playwright `APIRequestContext` (CRUD + PUT flows)
+- **API Testing** — dedicated `apiTests/` suite using Playwright `APIRequestContext` (CRUD, fixtures, JSONPath, AJV schema validation)
 - **Visual Step Utility** under `src/utils/visualStep.ts` — automatic screenshots for TTA reports
 - **Util Element Locator** under `src/utils/UtilElementLocator.ts` — consistent timeouts + integrated logging
 - **Data Generator** under `src/utils/DataGenerator.ts` — dynamic test data via `@faker-js/faker`
@@ -52,6 +52,8 @@ A complete, opinionated, batteries-included Playwright framework with **Page Obj
 - **Tag-based execution** — `@p0`, `@p1`, `@e2e`, `@smoke`, `@lor`
 - **Cross-browser** — Chromium, Firefox, WebKit, Mobile Chrome (Pixel 5)
 - **Dual Playwright projects** — `api` project (headless REST) + `chromium` project (UI)
+- **`jsonpath-plus`** — query live API responses with dot-notation, wildcards, recursive descent, and filter expressions
+- **Ajv schema validation** — JSON Schema contracts for every Restful Booker endpoint (POST, GET, PUT, PATCH, DELETE, ping)
 - **CI-aware config** — auto-tunes retries, workers, `forbidOnly`
 - **AI-agent rule files** for Claude Code, Copilot, Cursor, Windsurf, Augment, Antigravity, Aider, Codex, Jules
 - **ESLint + Prettier + tsc** quality gates enforced on every test change
@@ -67,7 +69,8 @@ AdvancePlaywrightFramework1x/
 │   ├── api/                   # API clients (REST / GraphQL)
 │   ├── config/                # Env loaders, constants, URLs
 │   ├── fixtures/
-│   │   └── test-base.ts       # Custom Playwright fixtures
+│   │   ├── test-base.ts       # Custom Playwright fixtures (UI)
+│   │   └── booker.fixture.ts  # API fixtures — bookingApi + bookerToken
 │   ├── pages/                 # Page Object Model classes
 │   │   ├── BasePage.ts        # Base class all pages extend
 │   │   ├── LoginPage.ts
@@ -81,16 +84,27 @@ AdvancePlaywrightFramework1x/
 │   ├── testdata/              # CSV / JSON / XLSX test data
 │   ├── tests/
 │   │   ├── apiTests/          # REST API test specs
-│   │   │   ├── 01_restfulbooker_raw/     # Level 1 — raw APIRequestContext
-│   │   │   │   ├── basic_Ping.spec.ts        # Simple GET health-check against /ping
-│   │   │   │   ├── curd_operation.spec.ts    # GET ping with full status + body assertion
-│   │   │   │   ├── post_operation.spec.ts    # POST booking flow with auth + test.step()
-│   │   │   │   ├── newContext_api.spec.ts    # Isolated context via request.newContext()
-│   │   │   │   ├── crud.spec.ts              # Serial CRUD flow (auth → create → update)
-│   │   │   │   └── put_operation.spec.ts     # PUT operation standalone test
-│   │   │   └── 02_restfulbooker_apiHelper/  # Level 2 — ApiHelper abstraction layer
-│   │   │       ├── create_Booking.spec.ts    # POST booking via ApiHelper + test.step()
-│   │   │       └── update_Booking.spec.ts    # PUT booking via ApiHelper + Cookie token
+│   │   │   ├── 01_restfulbooker_raw/          # Level 1 — raw APIRequestContext
+│   │   │   │   ├── basic_Ping.spec.ts             # Simple GET health-check against /ping
+│   │   │   │   ├── curd_operation.spec.ts         # GET ping with full status + body assertion
+│   │   │   │   ├── post_operation.spec.ts         # POST booking flow with auth + test.step()
+│   │   │   │   ├── newContext_api.spec.ts         # Isolated context via request.newContext()
+│   │   │   │   ├── crud.spec.ts                   # Serial CRUD flow (auth → create → update)
+│   │   │   │   └── put_operation.spec.ts          # PUT operation standalone test
+│   │   │   ├── 02_restfulbooker_apiHelper/        # Level 2 — ApiHelper abstraction layer
+│   │   │   │   ├── create_Booking.spec.ts         # POST booking via ApiHelper + test.step()
+│   │   │   │   └── update_Booking.spec.ts         # PUT booking via ApiHelper + Cookie token
+│   │   │   ├── 03_restfulbooker_fixture_e2e/      # Level 3 — Playwright fixtures + full lifecycle
+│   │   │   │   └── booking-crud.e2e.spec.ts       # Create → PUT update → GET verify → DELETE → 404
+│   │   │   ├── 04_jsonpath_plus/                  # Level 4 — JSONPath queries on API responses
+│   │   │   │   └── jsonpath-queries.e2e.spec.ts   # Dot-notation, wildcards, recursive descent, filters
+│   │   │   └── 05_ajv_schema/                     # Level 5 — Ajv JSON Schema contract validation
+│   │   │       ├── create-booking-schema.spec.ts  # POST /booking schema (static + live + negative)
+│   │   │       ├── get-booking-schema.spec.ts     # GET /booking/{id} schema contract
+│   │   │       ├── put-booking-schema.spec.ts     # PUT /booking/{id} schema contract
+│   │   │       ├── patch-booking-schema.spec.ts   # PATCH /booking/{id} schema contract
+│   │   │       ├── delete-booking-schema.spec.ts  # DELETE /booking/{id} (201) schema contract
+│   │   │       └── ping-schema.spec.ts            # GET /ping health-check schema contract
 │   │   ├── e2e/               # End-to-end UI specs
 │   │   │   └── e2e-checkout.spec.ts  # Full checkout journey
 │   │   └── tests/             # Unit / integration specs
@@ -101,7 +115,8 @@ AdvancePlaywrightFramework1x/
 │       ├── CustomTTAReporter.ts   # TTA HTML reporter
 │       ├── UtilElementLocator.ts  # Playwright locator wrapper
 │       ├── DataGenerator.ts       # Faker-based test data factory
-│       └── visualStep.ts          # Auto-screenshot step utility
+│       ├── visualStep.ts          # Auto-screenshot step utility
+│       └── schemaValidator.ts     # Ajv wrapper — validateSchema({ valid, errors, errorText })
 │
 ├── docs/
 │   └── images/                # Screenshots and docs assets
@@ -169,7 +184,7 @@ TTA custom HTML reporter generates a branded report after every run, showing tes
 ### Install
 
 ```bash
-git clone https://github.com/PramodDutta/AdvancePlaywrightFramework1x.git
+git clone https://github.com/SathishQASelenium/AdvancePlaywrightFramework1x.git
 cd AdvancePlaywrightFramework1x
 npm install
 npx playwright install --with-deps
@@ -260,7 +275,7 @@ DEV_BASE_URL=http://localhost:3000
 API_BASE_URL=https://restful-booker.herokuapp.com
 LOG_LEVEL=info            # winston log level
 TEST_ENV=UAT              # shown in TTA report
-TEST_AUTHOR=Pramod
+TEST_AUTHOR=Sathish
 ```
 
 Switch env:
@@ -314,6 +329,96 @@ The framework includes a dedicated API testing suite under `src/tests/apiTests/`
 | `create_Booking.spec.ts` | POST `/booking` via `ApiHelper` — payload → response validation via `test.step()` |
 | `update_Booking.spec.ts` | PUT `/booking/{id}` via `ApiHelper` — auth → create → update → validate via `test.step()` |
 
+**Level 3 — `03_restfulbooker_fixture_e2e/` (Playwright fixtures + full booking lifecycle)**
+
+| File | Description |
+|------|-------------|
+| `booking-crud.e2e.spec.ts` | Full lifecycle — create → PUT update → GET verify persistence → DELETE → GET 404 confirmation |
+
+Token generation moves into a **custom Playwright fixture** (`booker.fixture.ts`). The `bookingApi` fixture wraps `BookingApi(request)` and the `bookerToken` fixture calls `bookingApi.auth()` once — both are injected automatically into each test.
+
+```ts
+// booker.fixture.ts
+export const test = base.extend<BookerFixtures>({
+  bookingApi: async ({ request }, use) => { await use(new BookingApi(request)); },
+  bookerToken: async ({ bookingApi }, use) => { await use(await bookingApi.auth()); },
+});
+```
+
+**Level 3 TTA Report**
+
+![Booking CRUD E2E TTA Report](docs/images/booking-crud.e2e.spec-TTA-Automation-Report-06-22-2026_11_21_PM.png)
+
+- **3/3 passed** — create → update + verify → delete + 404 in serial order
+- **Fixture-driven auth** — no token boilerplate in any test body
+- **Step-level attachments** — `created-booking` and `updated-booking` JSON attached per step
+- **Run date:** 22 June 2026, 11:21 PM
+
+---
+
+**Level 4 — `04_jsonpath_plus/` (JSONPath queries on API responses)**
+
+| File | Description |
+|------|-------------|
+| `jsonpath-queries.e2e.spec.ts` | Dot-notation, wildcards (`$.*`), recursive descent (`$..`), array index/slice/filter queries |
+
+Uses the [`jsonpath-plus`](https://www.npmjs.com/package/jsonpath-plus) library to query live API responses without manually chaining object properties. Covers 4 query patterns:
+
+| Pattern | Example | Purpose |
+|---------|---------|---------|
+| Dot-notation | `$.booking.firstname` | Navigate nested path |
+| Deep nested | `$.booking.bookingdates.checkin` | Multi-level traversal |
+| Wildcard | `$.booking.*` | All direct children of a node |
+| Recursive descent | `$..totalprice` | Find field anywhere in tree |
+| Array index | `$[0].bookingid` | First element |
+| Array slice | `$[-1:].bookingid` | Last element via negative slice |
+| Filter expression | `$[?(@.bookingid > 0)]` | Conditional filtering |
+
+**Level 4 TTA Report**
+
+![JSONPath Queries TTA Report](docs/images/jsonpath-queries.e2e.spec-TTA-Automation-Report-06-22-2026_11_23_PM.png)
+
+- **4/4 passed** — field queries, wildcard/recursive, array ops, cleanup
+- **14 steps** — each JSONPath pattern tested with a live API response
+- **Run date:** 22 June 2026, 11:23 PM
+
+---
+
+**Level 5 — `05_ajv_schema/` (Ajv JSON Schema contract validation)**
+
+| File | Description |
+|------|-------------|
+| `create-booking-schema.spec.ts` | POST `/booking` — static sample + live response + negative broken object |
+| `get-booking-schema.spec.ts` | GET `/booking/{id}` — schema contract with 3-step positive/live/negative pattern |
+| `put-booking-schema.spec.ts` | PUT `/booking/{id}` — full update response shape validated |
+| `patch-booking-schema.spec.ts` | PATCH `/booking/{id}` — partial update response contract |
+| `delete-booking-schema.spec.ts` | DELETE `/booking/{id}` — 201 Created status contract |
+| `ping-schema.spec.ts` | GET `/ping` — health-check response schema |
+
+Schema files live in `src/testdata/schemas/`. The shared `validateSchema()` utility (`src/utils/schemaValidator.ts`) wraps Ajv and returns `{ valid, errors, errorText }` for clean assertions.
+
+Every schema test runs **3 steps** by convention:
+1. **Static sample** — known-good object validates against the schema
+2. **Live response** — real API call, response validated at runtime
+3. **Negative / broken** — wrong types / missing required fields → must fail
+
+```ts
+// step 3 pattern — schema must bite
+const broken = { bookingid: 'not-a-number', booking: { firstname: 'Jim' /* lastname missing */ } };
+const { valid, errors } = validateSchema(schema, broken);
+expect(valid).toBe(false);
+expect(errors.length).toBeGreaterThan(0);
+```
+
+**Level 5 TTA Report**
+
+![AJV Schema Validation TTA Report](docs/images/create-booking-schema.spec-TTA-Automation-Report-06-22-2026_11_24_PM.png)
+
+- **1/1 passed** — `create-booking-schema.spec.ts` with static + live + negative assertions
+- **3 steps:** static sample valid → live POST response valid → broken object rejected
+- **Contract-first** — schema failures surface API regressions before functional tests catch them
+- **Run date:** 22 June 2026, 11:24 PM
+
 ### Playwright Config — `api` Project
 
 The `playwright.config.ts` defines a dedicated `api` project that targets only API specs:
@@ -328,14 +433,21 @@ projects: [
 ### Run API tests
 
 ```bash
-# All API tests
+# All API tests (all 5 levels)
 npx playwright test --project=api
 
 # With API env resolved automatically
 TTA_ENV=api npx playwright test --project=api
 
+# Specific level
+npx playwright test src/tests/apiTests/01_restfulbooker_raw/ --project=api
+npx playwright test src/tests/apiTests/02_restfulbooker_apiHelper/ --project=api
+npx playwright test src/tests/apiTests/03_restfulbooker_fixture_e2e/ --project=api
+npx playwright test src/tests/apiTests/04_jsonpath_plus/ --project=api
+npx playwright test src/tests/apiTests/05_ajv_schema/ --project=api
+
 # Specific file
-npx playwright test src/tests/apiTests/crud.spec.ts --project=api
+npx playwright test src/tests/apiTests/01_restfulbooker_raw/crud.spec.ts --project=api
 ```
 
 ### CRUD Flow Example
@@ -350,7 +462,7 @@ test.describe.serial('Restful Booker CRUD API', () => {
 });
 ```
 
-`test.describe.serial` ensures shared state (`bookingFlowState`) flows across dependent tests in order.
+`test.describe.serial` ensures shared state (`bookingFlowState` / `bookingId`) flows across dependent tests in order. Levels 3 and 4 use the same pattern via `booker.fixture.ts`.
 
 ### Latest API Test Run
 
@@ -389,7 +501,7 @@ TTA custom HTML reporter captures every API test step, request/response details,
 ```ts
 import logger from '@utils/logger';
 
-logger.info('login start', { user: 'pramod' });
+logger.info('login start', { user: 'sathish' });
 logger.warn('slow API response', { ms: 3200 });
 logger.error('test failed', new Error('boom'));
 logger.debug('payload %o', { id: 1 });
@@ -426,8 +538,16 @@ graph TD
     POM --> UEL[UtilElementLocator]
     UEL --> PW[Playwright Engine]
 
-    T --> API[APIRequestContext]
+    T --> FX[booker.fixture.ts]
+    FX --> BA[BookingApi]
+    BA --> API[APIRequestContext]
     API --> REST[REST Endpoints]
+
+    T --> JP[jsonpath-plus]
+    JP --> REST
+
+    T --> SV[schemaValidator / Ajv]
+    SV --> SC[JSON Schemas]
 
     T --> DG[DataGenerator]
     DG --> F[Faker JS]
@@ -435,16 +555,19 @@ graph TD
     T --> L[Winston Logger]
     POM --> L
     UEL --> L
+    BA --> L
 ```
 
 ### Component Breakdown
 
-1. **Tests (`src/tests/`)**: Define the "what". Organized into `e2e/`, `apiTests/`, and `tests/` subdirectories.
+1. **Tests (`src/tests/`)**: Define the "what". Organized into `e2e/`, `apiTests/` (5 levels), and `tests/` subdirectories.
 2. **Page Objects (`src/pages/`)**: Define the "where". 8 page classes covering login → inventory → cart → checkout → complete.
 3. **UtilElementLocator (`src/utils/UtilElementLocator.ts`)**: The "how". Wraps Playwright `Locator` with consistent timeouts and integrated logging.
 4. **DataGenerator (`src/utils/DataGenerator.ts`)**: Dynamic, realistic test data via `@faker-js/faker`.
-5. **Logger (`src/utils/logger.ts`)**: Scoped logging (e.g., `[LoginPage] clicked login button`) for easier debugging.
+5. **Logger (`src/utils/logger.ts`)**: Scoped logging (e.g., `[booking-crud] created booking id 42`) for easier debugging.
 6. **CustomTTAReporter (`src/utils/CustomTTAReporter.ts`)**: TTA-branded HTML report with inline screenshots and video per test.
+7. **booker.fixture.ts (`src/fixtures/`)**: Playwright fixture that injects `bookingApi` (BookingApi instance) and `bookerToken` (auto-generated auth token) into API tests — eliminates auth boilerplate.
+8. **schemaValidator (`src/utils/schemaValidator.ts`)**: Ajv wrapper returning `{ valid, errors, errorText }` — used by all Level 5 schema specs to validate live API responses against JSON Schema contracts.
 
 ### Interaction Sequence — UI Login
 
@@ -571,14 +694,12 @@ Full prompt-by-prompt build log for Phase 1 lives at [`docs/phase1/prompts.md`](
 
 ## Author
 
-**Pramod Dutta** — Founder, [The Testing Academy](https://thetestingacademy.com)
+**Sathish Kumar A S** — QA Automation Engineer
 
-- YouTube: [@thetestingacademy](https://youtube.com/@thetestingacademy)
-- LinkedIn: [pramoddutta](https://www.linkedin.com/in/pramoddutta/)
-- Website: [thetestingacademy.com](https://thetestingacademy.com)
+- GitHub: [SathishQASelenium](https://github.com/SathishQASelenium)
 
 ---
 
 ## License
 
-ISC © Pramod Dutta / The Testing Academy
+ISC © Sathish Kumar A S
