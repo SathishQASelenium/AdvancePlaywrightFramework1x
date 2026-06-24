@@ -18,6 +18,7 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import { RCAAgent, RCAResult } from '@ai/agents/RCAAgent';
+import { FlakyTestAnalyzerAgent, FlakyAnalysis } from '@ai/agents/FlakyTestAnalyzerAgent';
 
 interface StepData {
     title: string;
@@ -83,6 +84,7 @@ class CustomTTAReporter implements Reporter {
     private runningTests: Map<string, TestData> = new Map();
     private completedTestIds: Set<string> = new Set();
     private aiVerdicts: RCAResult[] = [];
+    private flakyAnalysis: FlakyAnalysis | null = null;
 
     onBegin(config: FullConfig, suite: Suite): void {
         const now = new Date();
@@ -435,6 +437,22 @@ class CustomTTAReporter implements Reporter {
             }
         }
 
+        // Save run snapshot for flaky detection
+        FlakyTestAnalyzerAgent.saveSnapshot(
+            this.runId,
+            this.testResults.map(t => ({ title: t.title, file: t.file, status: t.status }))
+        );
+
+        // Flaky Test Analyser — compare last 2 run snapshots
+        try {
+            this.flakyAnalysis = await FlakyTestAnalyzerAgent.analyse();
+            if (this.flakyAnalysis) {
+                console.log(`\n⚡ Flaky Analyser: ${this.flakyAnalysis.flaky.length} flaky, ${this.flakyAnalysis.alwaysFailing.length} always-failing`);
+            }
+        } catch (e) {
+            console.warn(`⚠️  Flaky analyser error: ${e}`);
+        }
+
         console.log('\n📊 Generating TTA HTML Report...');
         await this.generateReport();
         console.log(`✅ Report generated: ${this.outputFile}`);
@@ -706,6 +724,7 @@ class CustomTTAReporter implements Reporter {
             <button class="tab-btn active" onclick="switchTab('results', this)">📊 Test Results</button>
             <button class="tab-btn" onclick="switchTab('ai-data', this)">🤖 AI Data</button>
             <button class="tab-btn" onclick="switchTab('ai-verdict', this)">🔍 AI Verdict</button>
+            <button class="tab-btn" onclick="switchTab('flaky', this)">⚡ Flaky Tests</button>
         </div>
 
         <div id="tab-results" class="tab-panel">
@@ -721,6 +740,10 @@ class CustomTTAReporter implements Reporter {
 
         <div id="tab-ai-verdict" class="tab-panel" style="display:none">
             ${this.generateRCATab()}
+        </div>
+
+        <div id="tab-flaky" class="tab-panel" style="display:none">
+            ${this.generateFlakyTab()}
         </div>
     </div>
 
@@ -1099,6 +1122,54 @@ class CustomTTAReporter implements Reporter {
                 return `<div class="ai-card ai-card-error">❌ Failed to parse ${this.escapeHtml(file)}</div>`;
             }
         }).join('');
+    }
+
+    private generateFlakyTab(): string {
+        if (!this.flakyAnalysis) {
+            return '<div class="ai-empty">Need at least 2 runs to detect flaky tests. Run again to compare.</div>';
+        }
+        const f = this.flakyAnalysis;
+
+        const badge = (label: string, color: string) =>
+            `<span class="rca-badge" style="background:${color}">${label}</span>`;
+
+        const testRow = (title: string, type: 'flaky' | 'failing' | 'stable') => {
+            const colors: Record<string, string> = { flaky: '#d97706', failing: '#dc2626', stable: '#16a34a' };
+            const icons: Record<string, string> = { flaky: '⚡', failing: '❌', stable: '✅' };
+            return `<tr class="flaky-row flaky-${type}">
+                <td>${icons[type]}</td>
+                <td>${this.escapeHtml(title)}</td>
+                <td>${badge(type.toUpperCase(), colors[type])}</td>
+            </tr>`;
+        };
+
+        const rows = [
+            ...f.flaky.map(t => testRow(t, 'flaky')),
+            ...f.alwaysFailing.map(t => testRow(t, 'failing')),
+            ...f.stable.map(t => testRow(t, 'stable')),
+        ].join('');
+
+        return `
+        <div class="flaky-summary">
+            <div class="flaky-stat" style="border-color:#d97706">
+                <div class="flaky-stat-num" style="color:#d97706">${f.flaky.length}</div>
+                <div class="flaky-stat-label">⚡ Flaky</div>
+            </div>
+            <div class="flaky-stat" style="border-color:#dc2626">
+                <div class="flaky-stat-num" style="color:#dc2626">${f.alwaysFailing.length}</div>
+                <div class="flaky-stat-label">❌ Always Failing</div>
+            </div>
+            <div class="flaky-stat" style="border-color:#16a34a">
+                <div class="flaky-stat-num" style="color:#16a34a">${f.stable.length}</div>
+                <div class="flaky-stat-label">✅ Stable</div>
+            </div>
+        </div>
+        <div class="flaky-runs-meta">Comparing run <code>${f.run1Id}</code> vs <code>${f.run2Id}</code></div>
+        <div class="flaky-llm-summary">${this.escapeHtml(f.summary)}</div>
+        <table class="flaky-table">
+            <thead><tr><th></th><th>Test Name</th><th>Classification</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
     }
 
     private generateRCATab(): string {
@@ -2025,6 +2096,59 @@ class CustomTTAReporter implements Reporter {
             color: var(--gray-700);
         }
         .rca-fixes li { margin-bottom: 4px; }
+
+        /* ========== FLAKY TESTS TAB ========== */
+        .flaky-summary {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .flaky-stat {
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 20px 28px;
+            border-left: 4px solid;
+            flex: 1;
+            text-align: center;
+        }
+        .flaky-stat-num { font-size: 36px; font-weight: 700; line-height: 1; }
+        .flaky-stat-label { font-size: 13px; font-weight: 600; margin-top: 6px; color: var(--gray-600); text-transform: uppercase; }
+        .flaky-runs-meta {
+            font-size: 12px;
+            color: var(--gray-500);
+            margin-bottom: 10px;
+        }
+        .flaky-runs-meta code {
+            background: var(--gray-100);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .flaky-llm-summary {
+            background: #fffbeb;
+            border-left: 4px solid var(--warning);
+            padding: 14px 18px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--dark);
+            margin-bottom: 20px;
+        }
+        .flaky-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        .flaky-table thead { background: var(--dark); color: white; }
+        .flaky-table th { padding: 12px 16px; text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .flaky-table td { padding: 12px 16px; border-bottom: 1px solid var(--gray-100); font-size: 13px; }
+        .flaky-row.flaky-flaky { background: #fffbeb; }
+        .flaky-row.flaky-failing { background: #fef2f2; }
+        .flaky-row.flaky-stable { background: #f0fdf4; }
         `;
     }
 
