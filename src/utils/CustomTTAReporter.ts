@@ -17,6 +17,7 @@ import {
 } from '@playwright/test/reporter';
 import * as fs from 'fs';
 import * as path from 'path';
+import { RCAAgent, RCAResult } from '@ai/agents/RCAAgent';
 
 interface StepData {
     title: string;
@@ -81,6 +82,7 @@ class CustomTTAReporter implements Reporter {
     private testCounter: number = 0;
     private runningTests: Map<string, TestData> = new Map();
     private completedTestIds: Set<string> = new Set();
+    private aiVerdicts: RCAResult[] = [];
 
     onBegin(config: FullConfig, suite: Suite): void {
         const now = new Date();
@@ -418,6 +420,21 @@ class CustomTTAReporter implements Reporter {
         console.log(`║  📈 Pass Rate: ${(passRate + '%').padEnd(47)}║`);
         console.log('╚════════════════════════════════════════════════════════════════╝');
 
+        // RCA Agent — analyse all failed tests via LLM
+        const failedTests = this.testResults.filter(t => t.status === 'failed' || t.status === 'timedOut');
+        if (failedTests.length > 0 && process.env.LLM_API_KEY) {
+            console.log(`\n🤖 RCA Agent analysing ${failedTests.length} failure(s)...`);
+            for (const t of failedTests) {
+                try {
+                    const rca = await RCAAgent.analyse(t.title, t.error ?? 'Unknown error', t.errorStack ?? '', t.file);
+                    this.aiVerdicts.push(rca);
+                    console.log(`   ✅ RCA done: ${t.title}`);
+                } catch (e) {
+                    console.warn(`   ⚠️  RCA failed for "${t.title}": ${e}`);
+                }
+            }
+        }
+
         console.log('\n📊 Generating TTA HTML Report...');
         await this.generateReport();
         console.log(`✅ Report generated: ${this.outputFile}`);
@@ -688,6 +705,7 @@ class CustomTTAReporter implements Reporter {
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('results', this)">📊 Test Results</button>
             <button class="tab-btn" onclick="switchTab('ai-data', this)">🤖 AI Data</button>
+            <button class="tab-btn" onclick="switchTab('ai-verdict', this)">🔍 AI Verdict</button>
         </div>
 
         <div id="tab-results" class="tab-panel">
@@ -699,6 +717,10 @@ class CustomTTAReporter implements Reporter {
 
         <div id="tab-ai-data" class="tab-panel" style="display:none">
             ${this.generateAIVerdictTab()}
+        </div>
+
+        <div id="tab-ai-verdict" class="tab-panel" style="display:none">
+            ${this.generateRCATab()}
         </div>
     </div>
 
@@ -1076,6 +1098,33 @@ class CustomTTAReporter implements Reporter {
             } catch {
                 return `<div class="ai-card ai-card-error">❌ Failed to parse ${this.escapeHtml(file)}</div>`;
             }
+        }).join('');
+    }
+
+    private generateRCATab(): string {
+        if (this.aiVerdicts.length === 0) {
+            return '<div class="ai-empty">No failures detected — nothing to analyse. 🎉</div>';
+        }
+        const severityColor: Record<string, string> = {
+            Critical: '#dc2626', High: '#ea580c', Medium: '#d97706', Low: '#16a34a',
+        };
+        return this.aiVerdicts.map(rca => {
+            const color = severityColor[rca.severity] ?? '#6b7280';
+            const fixes = rca.fixes.map(f => `<li>${this.escapeHtml(f)}</li>`).join('');
+            return `
+            <div class="rca-card">
+                <div class="rca-header">🔍 ${this.escapeHtml(rca.testTitle)}</div>
+                <div class="rca-body">
+                    <div class="rca-badges">
+                        <span class="rca-badge" style="background:${color}">⚠️ ${this.escapeHtml(rca.severity)}</span>
+                        <span class="rca-badge rca-priority">🎯 ${this.escapeHtml(rca.priority)}</span>
+                    </div>
+                    <div class="rca-section-label">Root Cause</div>
+                    <div class="rca-root-cause">${this.escapeHtml(rca.rootCause)}</div>
+                    <div class="rca-section-label">How to Fix</div>
+                    <ul class="rca-fixes">${fixes}</ul>
+                </div>
+            </div>`;
         }).join('');
     }
 
@@ -1921,6 +1970,61 @@ class CustomTTAReporter implements Reporter {
         .ai-key { font-weight: 600; color: var(--primary-dark); width: 200px; font-family: 'JetBrains Mono', monospace; }
         .ai-val { color: var(--dark); }
         .ai-card-error { border-left-color: var(--danger); padding: 16px 20px; color: var(--danger); font-weight: 600; }
+
+        /* ========== RCA / AI VERDICT TAB ========== */
+        .rca-card {
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 24px;
+            overflow: hidden;
+            border-left: 4px solid var(--danger);
+        }
+        .rca-header {
+            background: #fef2f2;
+            padding: 14px 20px;
+            font-weight: 700;
+            font-size: 14px;
+            color: #991b1b;
+            border-bottom: 1px solid #fecaca;
+        }
+        .rca-body { padding: 20px; }
+        .rca-badges { display: flex; gap: 10px; margin-bottom: 16px; }
+        .rca-badge {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            color: white;
+            letter-spacing: 0.3px;
+        }
+        .rca-priority { background: #7c3aed; }
+        .rca-section-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--gray-500);
+            margin-bottom: 6px;
+            margin-top: 14px;
+        }
+        .rca-root-cause {
+            background: #fff7ed;
+            border-left: 4px solid var(--warning);
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+        .rca-fixes {
+            margin: 0;
+            padding-left: 20px;
+            line-height: 1.8;
+            font-size: 13px;
+            color: var(--gray-700);
+        }
+        .rca-fixes li { margin-bottom: 4px; }
         `;
     }
 
