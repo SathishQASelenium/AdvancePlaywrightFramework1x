@@ -684,10 +684,22 @@ class CustomTTAReporter implements Reporter {
 
     <div class="container">
         ${this.generateMetaSection(browserName, platform)}
-        ${this.generateSuiteStatus()}
-        ${this.generateRunStatus()}
-        ${this.generateFilters()}
-        ${this.generateTestTable()}
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('results', this)">📊 Test Results</button>
+            <button class="tab-btn" onclick="switchTab('ai-verdict', this)">🤖 AI Verdict</button>
+        </div>
+
+        <div id="tab-results" class="tab-panel">
+            ${this.generateSuiteStatus()}
+            ${this.generateRunStatus()}
+            ${this.generateFilters()}
+            ${this.generateTestTable()}
+        </div>
+
+        <div id="tab-ai-verdict" class="tab-panel" style="display:none">
+            ${this.generateAIVerdictTab()}
+        </div>
     </div>
 
     <div id="screenshotModal" class="modal">
@@ -1037,6 +1049,34 @@ class CustomTTAReporter implements Reporter {
 
         html += '</div>';
         return html;
+    }
+
+    private generateAIVerdictTab(): string {
+        const aiGenDir = path.resolve('src/testdata/ai-generated');
+        if (!fs.existsSync(aiGenDir)) {
+            return '<div class="ai-empty">No AI-generated data found. Run an AI data generator test first.</div>';
+        }
+        const files = fs.readdirSync(aiGenDir).filter(f => f.endsWith('.json')).sort().reverse();
+        if (files.length === 0) {
+            return '<div class="ai-empty">No AI-generated data found. Run an AI data generator test first.</div>';
+        }
+        return files.map(file => {
+            try {
+                const raw = fs.readFileSync(path.join(aiGenDir, file), 'utf-8');
+                const data = JSON.parse(raw) as Record<string, unknown>;
+                const rows = Object.entries(data).map(([k, v]) => {
+                    const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
+                    return `<tr><td class="ai-key">${this.escapeHtml(k)}</td><td class="ai-val">${this.escapeHtml(val)}</td></tr>`;
+                }).join('');
+                return `
+                <div class="ai-card">
+                    <div class="ai-card-header">🤖 ${this.escapeHtml(file)}</div>
+                    <table class="ai-table"><tbody>${rows}</tbody></table>
+                </div>`;
+            } catch {
+                return `<div class="ai-card ai-card-error">❌ Failed to parse ${this.escapeHtml(file)}</div>`;
+            }
+        }).join('');
     }
 
     private escapeHtml(text: string): string {
@@ -1823,11 +1863,76 @@ class CustomTTAReporter implements Reporter {
             .meta-section, .filters { flex-direction: column; align-items: flex-start; }
             .stats-dashboard { grid-template-columns: repeat(2, 1fr); }
         }
+
+        /* ========== TABS ========== */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 2px solid var(--gray-200);
+            padding-bottom: 0;
+        }
+        .tab-btn {
+            padding: 12px 24px;
+            border: none;
+            background: none;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-500);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+        }
+        .tab-btn:hover { color: var(--primary); background: var(--primary-bg); }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: var(--primary-bg); }
+
+        /* ========== AI VERDICT TAB ========== */
+        .ai-empty {
+            background: white;
+            border-radius: var(--radius);
+            padding: 40px;
+            text-align: center;
+            color: var(--gray-500);
+            font-size: 15px;
+            box-shadow: var(--shadow);
+        }
+        .ai-card {
+            background: white;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+            overflow: hidden;
+            border-left: 4px solid var(--primary);
+        }
+        .ai-card-header {
+            background: linear-gradient(135deg, var(--primary-bg) 0%, #d1fae5 100%);
+            padding: 14px 20px;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--primary-dark);
+            font-family: 'JetBrains Mono', monospace;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        .ai-table { width: 100%; border-collapse: collapse; }
+        .ai-table tr:nth-child(even) { background: var(--gray-50); }
+        .ai-table td { padding: 12px 20px; border-bottom: 1px solid var(--gray-100); font-size: 13px; }
+        .ai-key { font-weight: 600; color: var(--primary-dark); width: 200px; font-family: 'JetBrains Mono', monospace; }
+        .ai-val { color: var(--dark); }
+        .ai-card-error { border-left-color: var(--danger); padding: 16px 20px; color: var(--danger); font-weight: 600; }
         `;
     }
 
     private getScripts(): string {
         return `
+        function switchTab(tabId, btn) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + tabId).style.display = 'block';
+            btn.classList.add('active');
+        }
+
         function toggleFileGroup(header) {
             const fileGroup = header.parentElement;
             fileGroup.classList.toggle('collapsed');
