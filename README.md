@@ -25,6 +25,7 @@ A complete, opinionated, batteries-included Playwright framework with **Page Obj
 - [Reporting](#reporting)
 - [Framework Architecture](#framework-architecture)
 - [AI Agent Rules](#ai-agent-rules)
+- [AI Layer](#ai-layer)
 - [Project Rules](#project-rules)
 - [CI/CD Integration (Jenkins)](#cicd-integration-jenkins)
 - [Phase 1 Walkthrough](#phase-1-walkthrough)
@@ -55,6 +56,7 @@ A complete, opinionated, batteries-included Playwright framework with **Page Obj
 - **`jsonpath-plus`** — query live API responses with dot-notation, wildcards, recursive descent, and filter expressions
 - **Ajv schema validation** — JSON Schema contracts for every Restful Booker endpoint (POST, GET, PUT, PATCH, DELETE, ping)
 - **CI-aware config** — auto-tunes retries, workers, `forbidOnly`
+- **AI Layer** (`src/ai/`) — `LLMGateway` (multi-provider: OpenAI, Anthropic, Ollama) + `CustomDataGeneratorAgent` (LLM-driven JSON test data factory)
 - **AI-agent rule files** for Claude Code, Copilot, Cursor, Windsurf, Augment, Antigravity, Aider, Codex, Jules
 - **ESLint + Prettier + tsc** quality gates enforced on every test change
 - **Docker-ready** (Dockerfile placeholder)
@@ -105,6 +107,9 @@ AdvancePlaywrightFramework1x/
 │   │   │       ├── patch-booking-schema.spec.ts   # PATCH /booking/{id} schema contract
 │   │   │       ├── delete-booking-schema.spec.ts  # DELETE /booking/{id} (201) schema contract
 │   │   │       └── ping-schema.spec.ts            # GET /ping health-check schema contract
+│   │   │   └── 06_ai_data_generator/              # Level 6 — LLM-powered test data generation
+│   │   │       ├── customer-vehicle-data.spec.ts  # Generates customer + vehicle booking JSON via LLM
+│   │   │       └── seed.spec.ts                   # Seeds testdata/ with AI-generated booking fixtures
 │   │   ├── e2e/               # End-to-end UI specs
 │   │   │   └── e2e-checkout.spec.ts  # Full checkout journey
 │   │   └── tests/             # Unit / integration specs
@@ -117,6 +122,10 @@ AdvancePlaywrightFramework1x/
 │       ├── DataGenerator.ts       # Faker-based test data factory
 │       ├── visualStep.ts          # Auto-screenshot step utility
 │       └── schemaValidator.ts     # Ajv wrapper — validateSchema({ valid, errors, errorText })
+│
+├── src/ai/                    # AI layer — LLM integration
+│   ├── LLMGateway.ts          # Multi-provider LLM client (OpenAI / Anthropic / Ollama)
+│   └── CustomDataGeneratorAgent.ts  # Domain-aware prompt → JSON file writer
 │
 ├── docs/
 │   └── images/                # Screenshots and docs assets
@@ -134,7 +143,15 @@ AdvancePlaywrightFramework1x/
 │
 ├── .github/
 │   ├── copilot-instructions.md
-│   └── workflows/             # GitHub Actions CI
+│   ├── workflows/             # GitHub Actions CI
+│   └── agents/                # AI coding-agent files (GitHub Copilot, Claude, Cursor, etc.)
+│       ├── tta-playwright-test-planner.agent.md   # MCP-based: plan TTA Cart tests
+│       ├── tta-playwright-test-generator.agent.md # MCP-based: generate spec files
+│       ├── tta-playwright-test-healer.agent.md    # MCP-based: debug + fix failures
+│       └── cli/                                   # CLI-based variants (token-efficient)
+│           ├── tta-playwright-test-planner.agent.md
+│           ├── tta-playwright-test-generator.agent.md
+│           └── tta-playwright-test-healer.agent.md
 │
 ├── .claude/                   # Claude Code config
 ├── .cursor/rules/             # Cursor MDC rules
@@ -249,6 +266,7 @@ Defined in `tsconfig.json`:
 | `@testdata/*` | `src/testdata/*` |
 | `@tests/*` | `src/tests/*` |
 | `@utils/*` | `src/utils/*` |
+| `@ai/*` | `src/ai/*` |
 
 Example:
 ```ts
@@ -419,6 +437,37 @@ expect(errors.length).toBeGreaterThan(0);
 - **Contract-first** — schema failures surface API regressions before functional tests catch them
 - **Run date:** 22 June 2026, 11:24 PM
 
+---
+
+**Level 6 — `06_ai_data_generator/` (LLM-powered test data generation)**
+
+| File | Description |
+|------|-------------|
+| `customer-vehicle-data.spec.ts` | Generates realistic customer + vehicle booking data via LLM, writes typed JSON to `src/testdata/generated/` |
+| `seed.spec.ts` | Seeds test environment with AI-generated booking data before suite execution |
+
+Uses `CustomDataGeneratorAgent` — an LLM-backed data factory that calls `LLMGateway` (multi-provider: OpenAI, Anthropic, Ollama) and writes structured JSON files under `src/testdata/`. All generated data is framework-typed and immediately usable by `buildBooking(overrides?)`. Tests in this level are tagged `@ai` and target the `api` project.
+
+**Level 6 TTA Report — Test Results**
+
+![AI Data Generator Test Results](docs/images/TTA-Automation-Report-06-25-2026_01_38_AM.png)
+
+- **5 total tests** — 3 passed, 2 failed (60% pass rate), 3s total duration
+- **`@ai`-tagged suite** — AI data generator specs surface alongside standard API tests in the same report
+- **Flaky test detection** — 2 intermittent failures captured across run comparisons by the reporter
+- **Run date:** 25 June 2026, 01:38 AM
+
+**Level 6 TTA Report — AI Data Tab**
+
+![AI Data Tab — Generated JSON](docs/images/TTA-Automation-Report-06-25-2026_01_39_AM.png)
+
+- **Dedicated "AI Data" tab** in TTA reporter — displays all JSON files produced by `CustomDataGeneratorAgent` during the run
+- **Multiple booking objects per run** — each with unique names, total prices, and check-in/check-out dates (faker-seeded, LLM-shaped into domain-valid shapes)
+- **Zero hardcoded payloads** — every test fixture produced by the AI layer at runtime; no static JSON committed to the repo
+- **Run date:** 25 June 2026, 01:39 AM
+
+---
+
 ### Playwright Config — `api` Project
 
 The `playwright.config.ts` defines a dedicated `api` project that targets only API specs:
@@ -445,6 +494,7 @@ npx playwright test src/tests/apiTests/02_restfulbooker_apiHelper/ --project=api
 npx playwright test src/tests/apiTests/03_restfulbooker_fixture_e2e/ --project=api
 npx playwright test src/tests/apiTests/04_jsonpath_plus/ --project=api
 npx playwright test src/tests/apiTests/05_ajv_schema/ --project=api
+npx playwright test src/tests/apiTests/06_ai_data_generator/ --project=api
 
 # Specific file
 npx playwright test src/tests/apiTests/01_restfulbooker_raw/crud.spec.ts --project=api
@@ -624,6 +674,218 @@ This repo ships rules for every major AI coding assistant:
 | Antigravity / Codex / Aider / Jules | [`AGENTS.md`](./AGENTS.md) |
 
 All enforce the same rule: **`npm run typecheck && npm run lint`** after every test change.
+
+---
+
+## TTA-Specific AI Agents
+
+Framework-aware agent files live in [`.github/agents/`](./.github/agents/). These replace the generic Playwright agents with versions that know the exact POM classes, fixtures, locators, tags, data builders, and file structure of this project.
+
+### Agent Variants
+
+| Variant | Location | Transport | Token cost |
+|---|---|---|---|
+| MCP-based | `.github/agents/` | Playwright MCP server | Higher — full browser tool API |
+| CLI-based | `.github/agents/cli/` | `playwright-cli` Bash commands | ~75% lower — YAML snapshots only |
+
+> **Prefer the CLI variant** for day-to-day planning and generation. Use MCP when your AI host (GitHub Copilot, Cursor) has native MCP support and you need richer tool integration.
+
+### Available Agents
+
+| Agent | Purpose |
+|---|---|
+| `tta-playwright-test-planner` | Explores TTA Cart live, identifies coverage gaps, produces `specs/tta-cart-test-plan.md` |
+| `tta-playwright-test-generator` | Reads a TC from the plan, verifies behaviour live, writes a TypeScript spec file |
+| `tta-playwright-test-healer` | Runs failing tests, traces root cause to the right layer (POM/spec/fixture), applies fix |
+
+### What the agents enforce
+
+Every agent embeds and enforces these non-negotiable rules:
+
+- **Fixture imports** — UI tests use `@fixtures/test-base`, API tests use `@fixtures/booker.fixture`
+- **No raw locators in specs** — all interactions go through POM methods
+- **Path aliases always** — `@pages/`, `@utils/`, `@fixtures/`, etc. — never relative paths
+- **Data via builders** — `DataGenerator.checkoutCustomer()`, `buildBooking(overrides?)`, `credentials.*`
+- **Tags in `test.describe()`** — `@P0`, `@P1`, `@smoke`, `@regression`, `@e2e`, `@Checkout`, `@api`
+- **`test.step()` on every action** + `createLogger('filename.spec')` in every file
+- **Quality gate after every change** — `npm run typecheck && npm run lint`
+- **Fix at the right layer** — locator bugs in POM, assertion bugs in spec, data bugs in testdata
+
+### CLI Agent Quick Reference
+
+```bash
+# Planner — explore app and generate test plan
+# (invoke via GitHub Copilot / Claude with agent: tta-playwright-test-planner-cli)
+# Internally uses:
+playwright-cli open https://app.thetestingacademy.com/playwright/ttacart/index.html
+playwright-cli snapshot
+playwright-cli fill e7 "standard_user"
+playwright-cli click e10
+
+# Generator — generate spec from plan TC entry
+# Writes file directly to src/tests/tests/my-feature.spec.ts
+# Then validates:
+npm run typecheck && npm run lint
+
+# Healer — find and fix failing tests
+npx playwright test --project=chromium --reporter=list   # identify failures
+playwright-cli open URL                                  # inspect broken locator
+# Edit POM or spec, then:
+npm run typecheck && npm run lint
+npx playwright test path/to/fixed.spec.ts --project=chromium
+```
+
+---
+
+## AI Layer
+
+The framework includes a native AI layer (`src/ai/`) that integrates Large Language Models directly into the test data pipeline. This layer sits above the utility layer and below the test specs — it generates, validates, and seeds domain-typed data that flows through the same `buildBooking()` / `DataGenerator` interfaces already used by every test.
+
+### Architecture
+
+```
+LLM Provider (OpenAI / Anthropic / Ollama)
+          ↓
+  LLMGateway (src/ai/LLMGateway.ts)          ← multi-provider abstraction
+          ↓
+  CustomDataGeneratorAgent                    ← domain-aware prompt + JSON parsing
+  (src/ai/CustomDataGeneratorAgent.ts)
+          ↓
+  src/testdata/generated/*.json               ← typed JSON written to disk
+          ↓
+  buildBooking() / DataGenerator              ← existing test data interface unchanged
+          ↓
+  Test specs  (@ai-tagged, project=api)
+```
+
+### Core Modules
+
+| Module | Path | Purpose |
+|--------|------|---------|
+| `LLMGateway` | `src/ai/LLMGateway.ts` | Routes prompts to OpenAI, Anthropic, or Ollama — single interface, provider selected via `AI_PROVIDER` in `.env` |
+| `CustomDataGeneratorAgent` | `src/ai/CustomDataGeneratorAgent.ts` | Sends typed prompts to `LLMGateway`, parses the JSON response, validates shape, writes `*.json` files to `src/testdata/generated/` |
+
+### Environment Configuration
+
+```dotenv
+AI_PROVIDER=openai          # openai | anthropic | ollama
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+OLLAMA_MODEL=llama3         # local model name when AI_PROVIDER=ollama
+```
+
+### AI-tagged spec pattern
+
+```ts
+import { test, expect } from '@fixtures/booker.fixture';
+import { createLogger } from '@utils/logger';
+import { CustomDataGeneratorAgent } from '@ai/CustomDataGeneratorAgent';
+
+const log = createLogger('customer-vehicle-data.spec');
+
+test.describe('@ai @P1 AI Data Generator — Customer Vehicle Booking', () => {
+
+    test('generates valid booking JSON via LLM', async ({ bookingApi, bookerToken }) => {
+
+        await test.step('Invoke CustomDataGeneratorAgent', async () => {
+            log.info('Requesting LLM-generated booking data');
+            const agent = new CustomDataGeneratorAgent();
+            await agent.generate({ count: 5, domain: 'customer-vehicle' });
+            // Writes src/testdata/generated/booking-*.json
+        });
+
+        await test.step('Create booking with AI data', async () => {
+            const { bookingid } = await bookingApi.createBooking(buildBooking());
+            expect(bookingid).toBeGreaterThan(0);
+            log.info(`Booking created: ${bookingid}`);
+        });
+    });
+});
+```
+
+Run:
+```bash
+npx playwright test src/tests/apiTests/06_ai_data_generator/ --project=api
+```
+
+---
+
+### TTA Reporter — AI Verdict Tab
+
+The TTA custom reporter includes a dedicated **AI Verdict** tab that runs an LLM analysis pass over test failures and classifies each one — before the engineer even opens the failure.
+
+![AI Verdict Tab — Root Cause Analysis](docs/images/TTA-Automation-Report-06-25-2026_01_40_AM.png)
+
+- **Root cause classification** — for each failing test, the tab shows the most probable root cause (race condition, wrong endpoint, auth failure, missing data) and tags it as `@p0`, `@p1`, or `@p2`
+- **Actionable fix suggestions** — "HOW TO FIX" bullets are generated per failure: retry mechanisms, synchronization points, endpoint URL verification
+- **Severity tagging** — failures marked `Critical` or `@P1` so triage prioritises correctly
+- **Run date:** 25 June 2026, 01:40 AM
+
+**Example AI Verdict output from this run:**
+
+| Test | AI Classification | Root Cause | Fix |
+|------|------------------|------------|-----|
+| `flaky-test-B: unstable booking count check @p1 @ai` | Flaky | Race condition / external data dependency | Add retries, synchronisation, consistent test data |
+| `always-failing test: wrong endpoint assertion @p1 @ai` | Critical | 404 — endpoint incorrect or service down | Verify endpoint URL, confirm service is up, update spec |
+
+---
+
+### TTA Reporter — Flaky Tests Tab
+
+The **Flaky Tests** tab cross-references two consecutive run IDs to classify each test's stability over time — without any manual tagging.
+
+![Flaky Tests Tab — Cross-Run Comparison](docs/images/TTA-Automation-Report-06-25-2026_01_41_AM.png)
+
+- **Cross-run diff** — compares run `3630464629_R1897` vs `3630464629_R1933`; a test is `FLAKY` if it passed in one run but failed in the other
+- **4 stability states:** `FLAKY` · `FAILING` · `STABLE` · `STABLE` (was flaky, now consistently passing)
+- **Health summary** — "2 flaky, 1 always-failing, 2 stable" with an overall verdict paragraph recommending immediate investigation of flaky tests to unblock regression testing
+- **Full test classification table** — every test in the run listed with its stability label and a pass/fail icon per run
+- **Run date:** 25 June 2026, 01:41 AM
+
+**Stability breakdown from this run:**
+
+| Test | Run 1 | Run 2 | Classification |
+|------|-------|-------|----------------|
+| `flaky-test-A: unstable login check` | ✓ | ✗ | FLAKY |
+| `flaky-test-B: unstable booking count check` | ✓ | ✗ | FLAKY |
+| `always-failing test: wrong endpoint assertion` | ✗ | ✗ | FAILING |
+| `stable-test: booking API health check` | ✓ | ✓ | STABLE |
+| `flaky-test-C: intermittent response time check` | ✓ | ✓ | STABLE |
+
+---
+
+### AI Coding Agents (`.github/agents/`)
+
+Beyond the data layer, the framework ships three **AI coding agents** as `.agent.md` files that integrate with GitHub Copilot, Claude Code, Cursor, and Windsurf. Each agent is framework-aware — it embeds the exact POM class names, fixture imports, path aliases, `data-test` attribute values, tag conventions, and quality gate commands for this project.
+
+| Agent | MCP variant | CLI variant | Purpose |
+|-------|-------------|-------------|---------|
+| `tta-playwright-test-planner` | `.github/agents/tta-playwright-test-planner.agent.md` | `.github/agents/cli/tta-playwright-test-planner.agent.md` | Explores TTA Cart live, identifies coverage gaps, writes `specs/tta-cart-test-plan.md` |
+| `tta-playwright-test-generator` | `.github/agents/tta-playwright-test-generator.agent.md` | `.github/agents/cli/tta-playwright-test-generator.agent.md` | Reads a TC from the plan, verifies behaviour live, writes a production-ready TypeScript spec |
+| `tta-playwright-test-healer` | `.github/agents/tta-playwright-test-healer.agent.md` | `.github/agents/cli/tta-playwright-test-healer.agent.md` | Runs failing tests, traces root cause to the right layer (POM / spec / fixture), applies the fix |
+
+**MCP vs CLI variants:**
+
+| Dimension | MCP | CLI |
+|-----------|-----|-----|
+| Transport | Playwright MCP server (`mcp-servers: playwright-test`) | `playwright-cli` Bash commands |
+| Token cost | Higher — full browser tool API + screenshots | ~75% lower — YAML accessibility tree snapshots |
+| Best for | GitHub Copilot / Cursor with native MCP support | Day-to-day generation and healing sessions |
+| Session reuse | Via MCP session state | `playwright-cli state-save auth.json` |
+| Output format | MCP tool responses | Direct file writes via `Write` / `Edit` tool |
+
+**What every agent enforces:**
+
+- Fixture imports — UI: `@fixtures/test-base`, API: `@fixtures/booker.fixture`
+- No raw `page.locator()` in spec bodies — all interactions through POM methods
+- Path aliases always — `@pages/`, `@utils/`, `@fixtures/`, `@ai/`, never relative paths
+- Data via builders — `DataGenerator.checkoutCustomer()`, `buildBooking(overrides?)`, `credentials.*`
+- Tags in `test.describe()` only — `@P0`, `@P1`, `@smoke`, `@regression`, `@e2e`, `@Checkout`, `@api`, `@ai`
+- Every action inside `test.step()` + `createLogger('filename.spec')` in every file
+- Mandatory quality gate: `npm run typecheck && npm run lint`
+- Fix at the right layer — locator bugs in POM, assertion bugs in spec, data bugs in testdata
+
+See [TTA-Specific AI Agents](#tta-specific-ai-agents) for the full agent reference and CLI quick-start.
 
 ---
 

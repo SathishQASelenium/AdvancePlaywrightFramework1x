@@ -10,6 +10,7 @@ yarn-error.log
 /playwright/.cache/
 /playwright/.auth/
 /.playwright-cli/
+/.playwright-mcp/
 
 # Allure
 /allure-results/
