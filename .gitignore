@@ -34,6 +34,9 @@ yarn-error.log
 .DS_Store
 Thumbs.db
 
+# AI-generated test data (ephemeral, rebuilt per run)
+src/testdata/ai-generated/
+
 # IDE
 .idea/
 .vscode/*
