@@ -687,7 +687,7 @@ class CustomTTAReporter implements Reporter {
 
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('results', this)">📊 Test Results</button>
-            <button class="tab-btn" onclick="switchTab('ai-verdict', this)">🤖 AI Verdict</button>
+            <button class="tab-btn" onclick="switchTab('ai-data', this)">🤖 AI Data</button>
         </div>
 
         <div id="tab-results" class="tab-panel">
@@ -697,7 +697,7 @@ class CustomTTAReporter implements Reporter {
             ${this.generateTestTable()}
         </div>
 
-        <div id="tab-ai-verdict" class="tab-panel" style="display:none">
+        <div id="tab-ai-data" class="tab-panel" style="display:none">
             ${this.generateAIVerdictTab()}
         </div>
     </div>
