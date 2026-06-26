@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, APIResponse } from '@playwright/test';
 import { ApiHelper } from '@utils/ApiHelper';
 import { createLogger } from '@utils/logger';
 
@@ -37,7 +37,7 @@ test.describe('@P0 @regression Level 2 (APIHelper) - POST create booking', () =>
             additionalneeds: 'Breakfast',
         };
 
-        let response: any;
+        let response: APIResponse;
         let body: CreateBookingResponse;
 
         // Step 1: Send POST /booking request
@@ -51,7 +51,7 @@ test.describe('@P0 @regression Level 2 (APIHelper) - POST create booking', () =>
         // Step 2: Validate response body
         await test.step('Validate booking response body', async () => {
             log.info('Parsing response and validating booking details');
-            body = await api.parseJsonResponse<CreateBookingResponse>(response as any);
+            body = await api.parseJsonResponse<CreateBookingResponse>(response);
 
             expect(body.bookingid).toBeGreaterThan(0);
             expect(body.booking.firstname).toBe(payload.firstname);

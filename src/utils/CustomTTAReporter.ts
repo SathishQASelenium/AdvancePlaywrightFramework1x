@@ -19,6 +19,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { RCAAgent, RCAResult } from '@ai/agents/RCAAgent';
 import { FlakyTestAnalyzerAgent, FlakyAnalysis } from '@ai/agents/FlakyTestAnalyzerAgent';
+import { hasApiKey } from '@ai/config/providers';
 
 interface StepData {
     title: string;
@@ -206,8 +207,6 @@ class CustomTTAReporter implements Reporter {
         let statusIcon = '✅';
         if (result.status === 'passed') {
             this.suiteStats.passed++;
-            status = 'passed';
-            statusIcon = '✅';
         } else if (result.status === 'failed' || result.status === 'timedOut') {
             this.suiteStats.failed++;
             status = result.status === 'timedOut' ? 'timedOut' : 'failed';
@@ -436,7 +435,7 @@ class CustomTTAReporter implements Reporter {
 
         // RCA Agent — analyse all failed tests via LLM
         const failedTests = this.testResults.filter(t => t.status === 'failed' || t.status === 'timedOut');
-        if (failedTests.length > 0 && process.env.LLM_API_KEY) {
+        if (failedTests.length > 0 && hasApiKey()) {
             console.log(`\n🤖 RCA Agent analysing ${failedTests.length} failure(s)...`);
             for (const t of failedTests) {
                 try {
@@ -1208,8 +1207,10 @@ class CustomTTAReporter implements Reporter {
     }
 
     private stripAnsiCodes(text: string): string {
-        // Remove both standard ANSI escape codes (\x1B[...m) and text-encoded versions ([...m)
-        return text.replace(/\x1B\[[0-9;]*m/g, '').replace(/\[[0-9;]*m/g, '');
+        const esc = String.fromCharCode(27);
+        return text
+            .replace(new RegExp(esc + '\\[[0-9;]*m', 'g'), '')
+            .replace(/\[[0-9;]*m/g, '');
     }
 
     private getStyles(): string {

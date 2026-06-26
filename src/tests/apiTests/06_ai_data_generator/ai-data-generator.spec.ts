@@ -4,7 +4,7 @@ import * as path from 'path';
 import { generateTestData } from '@ai/agents/CustomDataGeneratorAgent';
 
 test.describe('CustomDataGeneratorAgent @p1 @ai', () => {
-    test('generates booking data from prompt and returns valid JSON path', async ({}, testInfo) => {
+    test('generates booking data from prompt and returns valid JSON path', async (_, testInfo) => {
         const result = await generateTestData({
             structurePath: path.join(__dirname, '../../../testdata/structures/booking.structure.json'),
             prompt: 'Generate one realistic hotel booking record. Vary the guest name, price (100–1000), dates, and additionalneeds each time.',

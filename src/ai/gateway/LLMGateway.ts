@@ -1,5 +1,29 @@
-import * as path from 'path';
-import * as fs from 'fs';
+/**
+ * LLMGateway — one entry point to every LLM provider.
+ *
+ *   import { llmGateway } from '@ai/gateway/LLMGateway';
+ *
+ *   const gw = llmGateway();                 // provider/model from env + models.json
+ *   const res = await gw.chat({
+ *       messages: [{ role: 'user', content: 'Say hi as JSON {"hi":true}' }],
+ *   });
+ *   console.log(res.content);
+ *
+ * OpenRouter, Groq and OpenAI all expose the same OpenAI-compatible
+ * `POST {baseUrl}/chat/completions` API. Claude uses a separate adapter.
+ * Provider is selected by env vars (LLM_PROVIDER / LLM_MODEL / LLM_API_KEY).
+ */
+
+import { createLogger } from '@utils/logger';
+import { resolveProvider } from '../config/providers';
+import type { ProviderOverrides } from '../config/providers';
+import type { ResolvedProvider } from '../types';
+
+const log = createLogger('LLMGateway');
+
+const DEFAULT_TIMEOUT_MS = 60_000;
+
+// ─── Exported interfaces (backward-compat aliases) ───────────────────────────
 
 export interface LLMMessage {
     role: 'system' | 'user' | 'assistant';
@@ -10,14 +34,19 @@ export interface LLMResponse {
     content: string;
     provider: string;
     model: string;
+    raw?: unknown;
 }
 
 export interface LLMChatOptions {
     messages: LLMMessage[];
+    /** Per-call model override. */
+    model?: string;
     temperature?: number;
     maxTokens?: number;
-    /** Request JSON output from the model (OpenAI-compatible: response_format json_object). */
+    /** Request JSON output (`response_format: json_object`). Defaults to true. */
     jsonMode?: boolean;
+    /** Request timeout in ms. Defaults to 60 000. */
+    timeoutMs?: number;
 }
 
 export interface LLMGatewayInstance {
@@ -26,185 +55,165 @@ export interface LLMGatewayInstance {
     chat(opts: LLMChatOptions): Promise<LLMResponse>;
 }
 
-interface ProviderConfig {
-    defaultModel: string;
-    baseUrl: string;
-}
+// ─── Internal response shapes ────────────────────────────────────────────────
 
-type ModelsConfig = Record<string, ProviderConfig>;
-
-interface OpenAIChatPayload {
-    model: string;
-    messages: LLMMessage[];
-    temperature?: number;
-    max_tokens?: number;
-    response_format?: { type: 'json_object' };
-}
-
-interface OpenAIChatResponse {
-    choices: Array<{ message: { content: string } }>;
-}
-
-interface ClaudePayload {
-    model: string;
-    max_tokens: number;
-    system?: string;
-    messages: Array<{ role: string; content: string }>;
+interface ChatCompletionResponse {
+    choices?: Array<{ message?: { content?: string } }>;
 }
 
 interface ClaudeResponse {
     content: Array<{ type: string; text: string }>;
 }
 
-function loadConfig(): ModelsConfig {
-    const configPath = path.resolve(__dirname, '../config/models.json');
-    return JSON.parse(fs.readFileSync(configPath, 'utf-8')) as ModelsConfig;
-}
-
-function resolveProvider(overrides?: {
-    provider?: string;
-    model?: string;
-}): { provider: string; model: string; apiKey: string; baseUrl: string } {
-    const provider = (overrides?.provider ?? process.env.LLM_PROVIDER ?? 'openrouter').toLowerCase();
-    const apiKey = process.env.LLM_API_KEY ?? '';
-
-    if (!apiKey) {
-        throw new Error('[LLMGateway] LLM_API_KEY is not set. Add it to .env or Jenkins credentials.');
-    }
-
-    const config = loadConfig();
-    const providerConfig = config[provider];
-
-    if (!providerConfig) {
-        throw new Error(`[LLMGateway] Unknown provider "${provider}". Valid: ${Object.keys(config).join(', ')}`);
-    }
-
-    const model = overrides?.model ?? process.env.LLM_MODEL ?? providerConfig.defaultModel;
-    const baseUrl = providerConfig.baseUrl;
-
-    return { provider, model, apiKey, baseUrl };
-}
+// ─── Provider adapters ───────────────────────────────────────────────────────
 
 async function callOpenAICompatible(
     messages: LLMMessage[],
-    resolved: { provider: string; model: string; apiKey: string; baseUrl: string },
-    opts: { temperature?: number; maxTokens?: number; jsonMode?: boolean }
+    resolved: ResolvedProvider,
+    opts: Omit<LLMChatOptions, 'messages'>,
 ): Promise<LLMResponse> {
-    const { provider, model, apiKey, baseUrl } = resolved;
+    const { provider, apiKey, baseUrl, extraHeaders } = resolved;
+    const model = opts.model ?? resolved.model;
+    const temperature = opts.temperature ?? 0;
+    const jsonMode = opts.jsonMode !== false;
+    const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
-    const payload: OpenAIChatPayload = {
+    const body: Record<string, unknown> = {
         model,
         messages,
-        temperature: opts.temperature ?? 0.7,
+        temperature,
         max_tokens: opts.maxTokens ?? 1024,
-        ...(opts.jsonMode ? { response_format: { type: 'json_object' } } : {}),
+        ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
     };
 
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-            ...(provider === 'openrouter' ? { 'HTTP-Referer': 'https://thetestingacademy.com' } : {}),
-        },
-        body: JSON.stringify(payload),
-    });
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+        ...extraHeaders,
+    };
 
-    if (!response.ok) {
-        const err = await response.text();
-        throw new Error(`[LLMGateway] ${provider} error ${response.status}: ${err}`);
+    log.info(`-> ${provider}/${model} (jsonMode=${jsonMode})`);
+    const startedAt = Date.now();
+
+    let res: Response;
+    try {
+        res = await fetch(`${baseUrl}/chat/completions`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(timeoutMs),
+        });
+    } catch (err) {
+        log.error(`${provider} request failed: ${(err as Error).message}`);
+        throw new Error(`LLMGateway: ${provider} request failed: ${(err as Error).message}`, { cause: err });
     }
 
-    const data = (await response.json()) as OpenAIChatResponse;
-    const content = data.choices?.[0]?.message?.content ?? '';
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        log.error(`${provider} HTTP ${res.status}: ${text.slice(0, 300)}`);
+        throw new Error(`LLMGateway: ${provider} HTTP ${res.status}: ${text.slice(0, 500)}`);
+    }
 
-    return { content, provider, model };
+    const json = (await res.json()) as ChatCompletionResponse;
+    const content = json.choices?.[0]?.message?.content;
+    if (typeof content !== 'string' || content.length === 0) {
+        throw new Error(`LLMGateway: ${provider} returned no message content.`);
+    }
+
+    log.info(`<- ${provider}/${model} ${Date.now() - startedAt}ms, ${content.length} chars`);
+    return { content, provider, model, raw: json };
 }
 
 async function callClaude(
     messages: LLMMessage[],
-    resolved: { provider: string; model: string; apiKey: string; baseUrl: string },
-    opts: { temperature?: number; maxTokens?: number }
+    resolved: ResolvedProvider,
+    opts: Omit<LLMChatOptions, 'messages'>,
 ): Promise<LLMResponse> {
-    const { model, apiKey, baseUrl } = resolved;
+    const { apiKey, baseUrl } = resolved;
+    const model = opts.model ?? resolved.model;
+    const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
     const systemMsg = messages.find(m => m.role === 'system');
     const userMessages = messages.filter(m => m.role !== 'system');
 
-    const payload: ClaudePayload = {
+    const body: Record<string, unknown> = {
         model,
         max_tokens: opts.maxTokens ?? 1024,
         ...(systemMsg ? { system: systemMsg.content } : {}),
         messages: userMessages.map(m => ({ role: m.role, content: m.content })),
     };
 
-    const response = await fetch(`${baseUrl}/v1/messages`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify(payload),
-    });
+    log.info(`-> claude/${model}`);
+    const startedAt = Date.now();
 
-    if (!response.ok) {
-        const err = await response.text();
-        throw new Error(`[LLMGateway] claude error ${response.status}: ${err}`);
+    let res: Response;
+    try {
+        res = await fetch(`${baseUrl}/v1/messages`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(timeoutMs),
+        });
+    } catch (err) {
+        log.error(`claude request failed: ${(err as Error).message}`);
+        throw new Error(`LLMGateway: claude request failed: ${(err as Error).message}`, { cause: err });
     }
 
-    const data = (await response.json()) as ClaudeResponse;
-    const content = data.content?.find(b => b.type === 'text')?.text ?? '';
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        log.error(`claude HTTP ${res.status}: ${text.slice(0, 300)}`);
+        throw new Error(`LLMGateway: claude HTTP ${res.status}: ${text.slice(0, 500)}`);
+    }
 
-    return { content, provider: 'claude', model };
+    const json = (await res.json()) as ClaudeResponse;
+    const content = json.content?.find(b => b.type === 'text')?.text ?? '';
+
+    log.info(`<- claude/${model} ${Date.now() - startedAt}ms, ${content.length} chars`);
+    return { content, provider: 'claude', model, raw: json };
 }
+
+// ─── Static class (reporter / legacy compat) ─────────────────────────────────
 
 export class LLMGateway {
     static async chat(
         messages: LLMMessage[],
-        opts: { temperature?: number; maxTokens?: number; jsonMode?: boolean } = {}
+        opts: Omit<LLMChatOptions, 'messages'> = {},
     ): Promise<LLMResponse> {
         const resolved = resolveProvider();
-
-        if (resolved.provider === 'claude') {
-            return callClaude(messages, resolved, opts);
-        }
-
+        if (resolved.provider === 'claude') return callClaude(messages, resolved, opts);
         return callOpenAICompatible(messages, resolved, opts);
     }
 
     static async complete(userPrompt: string, systemPrompt?: string): Promise<string> {
         const messages: LLMMessage[] = [];
-
-        if (systemPrompt) {
-            messages.push({ role: 'system', content: systemPrompt });
-        }
-
+        if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
         messages.push({ role: 'user', content: userPrompt });
-
         const result = await LLMGateway.chat(messages);
         return result.content;
     }
 }
 
+// ─── Factory (primary public API) ────────────────────────────────────────────
+
 /**
- * Factory that returns a bound gateway instance with optional provider/model overrides.
- * Falls back to LLM_PROVIDER / LLM_MODEL env vars when overrides are omitted.
+ * Returns a gateway bound to a resolved provider/model.
+ * Provider/model come from env vars; pass overrides to change per-call.
  *
  *   const gw = llmGateway({ provider: 'openai', model: 'gpt-4o' });
- *   const result = await gw.chat({ messages, temperature: 0, jsonMode: true });
+ *   const res = await gw.chat({ messages, jsonMode: true });
  */
-export function llmGateway(overrides?: { provider?: string; model?: string }): LLMGatewayInstance {
+export function llmGateway(overrides?: ProviderOverrides): LLMGatewayInstance {
     const resolved = resolveProvider(overrides);
-
     return {
         provider: resolved.provider,
         model: resolved.model,
         chat: (opts: LLMChatOptions) => {
             const { messages, ...rest } = opts;
-            if (resolved.provider === 'claude') {
-                return callClaude(messages, resolved, rest);
-            }
+            if (resolved.provider === 'claude') return callClaude(messages, resolved, rest);
             return callOpenAICompatible(messages, resolved, rest);
         },
     };

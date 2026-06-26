@@ -19,7 +19,7 @@ test.describe('@P0 @regression Level 2 (APIHelper) - PUT update booking', () => 
             log.info('Requesting auth token');
             const authRes = await api.post('/auth', { username: 'admin', password: 'password123' });
             log.info(`Auth response status: ${authRes.status()}`);
-            ({ token } = await api.parseJsonResponse<{ token: string }>(authRes as any));
+            ({ token } = await api.parseJsonResponse<{ token: string }>(authRes));
             expect(token).toBeTruthy();
             log.info('Auth token received');
         });
@@ -40,7 +40,7 @@ test.describe('@P0 @regression Level 2 (APIHelper) - PUT update booking', () => 
             });
             log.info(`Create booking response status: ${created.status()}`);
             expect(api.isSuccess(created)).toBe(true);
-            ({ bookingid } = await api.parseJsonResponse<{ bookingid: number }>(created as any));
+            ({ bookingid } = await api.parseJsonResponse<{ bookingid: number }>(created));
             log.info(`Created booking id: ${bookingid}`);
         });
 
@@ -65,7 +65,7 @@ test.describe('@P0 @regression Level 2 (APIHelper) - PUT update booking', () => 
             });
             log.info(`PUT response status: ${response.status()}`);
             expect(api.isSuccess(response)).toBe(true);
-            updated = await api.parseJsonResponse<{ firstname: string; lastname: string; totalprice: number; depositpaid: boolean; additionalneeds: string }>(response as any);
+            updated = await api.parseJsonResponse<{ firstname: string; lastname: string; totalprice: number; depositpaid: boolean; additionalneeds: string }>(response);
         });
 
         // Step 4: Validate updated booking response

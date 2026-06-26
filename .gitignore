@@ -36,7 +36,7 @@ yarn-error.log
 Thumbs.db
 
 # AI-generated test data (ephemeral, rebuilt per run)
-src/testdata/ai-generated/
+src/testdata/generated/
 
 # IDE
 .idea/

@@ -17,12 +17,16 @@ export interface ChatMessage {
 /** One provider entry as stored in `models.json`. */
 export interface ProviderConfig {
     baseUrl: string;
+    /** Name of the env var that holds the API key (e.g. "OPENROUTER_API_KEY"). */
+    apiKeyEnv: string;
     defaultModel: string;
+    models: string[];
 }
 
 /** Top-level shape of `models.json`. */
 export interface ModelsRegistry {
-    [provider: string]: ProviderConfig;
+    default: { provider: ProviderId };
+    providers: Record<string, ProviderConfig>;
 }
 
 /** A fully resolved provider — key already read and validated. */
@@ -54,6 +58,8 @@ export interface ChatResult {
     content: string;
     model: string;
     provider: ProviderId;
+    /** Full parsed response body, for debugging. */
+    raw: unknown;
 }
 
 /** Public surface of a gateway instance. */

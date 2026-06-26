@@ -114,8 +114,21 @@ export class FlakyTestAnalyzerAgent {
 
         if (files.length < 2) return null;
 
-        const run1 = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, files[0]), 'utf-8')) as RunSnapshot;
-        const run2 = JSON.parse(fs.readFileSync(path.join(RUNS_DIR, files[1]), 'utf-8')) as RunSnapshot;
+        // Load all snapshots and pick two most recent with comparable test counts.
+        // A partial run (e.g. single spec) would produce misleading flaky results
+        // when compared against a full suite run, so we skip snapshots whose count
+        // is less than 50% of the current run's count.
+        const snapshots = files.map(f =>
+            JSON.parse(fs.readFileSync(path.join(RUNS_DIR, f), 'utf-8')) as RunSnapshot,
+        );
+        const current = snapshots[0];
+        const currentCount = current.tests.length;
+        const prev = snapshots.slice(1).find(s => s.tests.length >= currentCount * 0.5);
+
+        if (!prev) return null;
+
+        const run1 = current;
+        const run2 = prev;
 
         const map1 = new Map(run1.tests.map(t => [t.title, t.status]));
         const map2 = new Map(run2.tests.map(t => [t.title, t.status]));

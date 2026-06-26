@@ -4,7 +4,7 @@
  */
 export function extractJson<T = unknown>(text: string): T {
     // Strip outer markdown fences (```json ... ``` or ``` ... ```)
-    let cleaned = text
+    const cleaned = text
         .replace(/^```(?:json)?\s*/im, '')
         .replace(/\s*```\s*$/m, '')
         .trim();
@@ -20,7 +20,7 @@ export function extractJson<T = unknown>(text: string): T {
     const objectStart = cleaned.indexOf('{');
     const arrayStart = cleaned.indexOf('[');
 
-    let start = -1;
+    let start: number;
     let endChar: '}' | ']';
 
     if (objectStart === -1 && arrayStart === -1) {

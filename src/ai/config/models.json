@@ -1,18 +1,29 @@
 {
-  "openrouter": {
-    "defaultModel": "openai/gpt-4o-mini",
-    "baseUrl": "https://openrouter.ai/api/v1"
-  },
-  "groq": {
-    "defaultModel": "llama-3.1-70b-versatile",
-    "baseUrl": "https://api.groq.com/openai/v1"
-  },
-  "openai": {
-    "defaultModel": "gpt-4o-mini",
-    "baseUrl": "https://api.openai.com/v1"
-  },
-  "claude": {
-    "defaultModel": "claude-haiku-4-5-20251001",
-    "baseUrl": "https://api.anthropic.com"
+  "default": { "provider": "openrouter" },
+  "providers": {
+    "openrouter": {
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY",
+      "defaultModel": "openai/gpt-4o-mini",
+      "models": ["openai/gpt-4o-mini", "openai/gpt-4o", "anthropic/claude-3-haiku"]
+    },
+    "groq": {
+      "baseUrl": "https://api.groq.com/openai/v1",
+      "apiKeyEnv": "GROQ_API_KEY",
+      "defaultModel": "llama-3.1-70b-versatile",
+      "models": ["llama-3.1-70b-versatile", "mixtral-8x7b-32768"]
+    },
+    "openai": {
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "defaultModel": "gpt-4o-mini",
+      "models": ["gpt-4o-mini", "gpt-4o"]
+    },
+    "claude": {
+      "baseUrl": "https://api.anthropic.com",
+      "apiKeyEnv": "ANTHROPIC_API_KEY",
+      "defaultModel": "claude-haiku-4-5-20251001",
+      "models": ["claude-haiku-4-5-20251001", "claude-sonnet-4-6"]
+    }
   }
 }
