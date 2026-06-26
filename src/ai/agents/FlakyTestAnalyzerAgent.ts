@@ -27,6 +27,75 @@ export interface FlakyAnalysis {
 
 const RUNS_DIR = path.resolve('tta-report/runs');
 
+// ─── Functional API (reference parity) ──────────────────────────────────────
+
+/** In-memory build snapshot passed to `analyzeFlaky()`. */
+export interface BuildSummary {
+    runId: string;
+    tests: Record<string, string>;
+}
+
+/** Result returned by `analyzeFlaky()`. */
+export interface FlakyResult {
+    flaky: string[];
+    failingNow: string[];
+    counts: { flaky: number; failing: number; total: number };
+    summary?: string;
+}
+
+/**
+ * Compare two in-memory build snapshots and return a `FlakyResult`.
+ * A test is flaky when its pass/fail verdict flipped between builds.
+ */
+export async function analyzeFlaky(
+    prev: BuildSummary,
+    curr: BuildSummary,
+    useLlm = true,
+): Promise<FlakyResult> {
+    const titles = new Set([...Object.keys(prev.tests), ...Object.keys(curr.tests)]);
+    const flaky: string[] = [];
+    const failingNow: string[] = [];
+
+    for (const title of titles) {
+        const p = prev.tests[title];
+        const c = curr.tests[title];
+        if ((isPass(p) && isFail(c)) || (isFail(p) && isPass(c))) flaky.push(title);
+        if (isFail(c)) failingNow.push(title);
+    }
+
+    const result: FlakyResult = {
+        flaky,
+        failingNow,
+        counts: { flaky: flaky.length, failing: failingNow.length, total: titles.size },
+    };
+
+    if (useLlm && flaky.length > 0) {
+        try {
+            const gw = llmGateway();
+            const user =
+                `Two builds of the same Playwright suite were compared.\n` +
+                `FLAKY tests (status flipped between builds):\n${flaky.map(t => `- ${t}`).join('\n')}\n\n` +
+                `Tests failing in the latest build:\n${failingNow.map(t => `- ${t}`).join('\n') || '- none'}\n\n` +
+                `In 3-4 short sentences: confirm which tests are flaky, why flakiness like this usually happens, and how to stabilize them. Plain text, no markdown.`;
+            const res = await gw.chat({
+                messages: [
+                    { role: 'system', content: 'You are a senior test-automation engineer judging test flakiness across builds.' },
+                    { role: 'user', content: user },
+                ],
+                jsonMode: false,
+            });
+            result.summary = res.content.trim();
+        } catch (e) {
+            log.warn(`LLM summary failed: ${(e as Error).message}`);
+        }
+    }
+
+    log.info(`Flaky: ${result.counts.flaky}, Failing: ${result.counts.failing}`);
+    return result;
+}
+
+// ─── File-based class (reporter compat) ─────────────────────────────────────
+
 export class FlakyTestAnalyzerAgent {
 
     static saveSnapshot(runId: string, tests: { title: string; file: string; status: string }[]): void {
