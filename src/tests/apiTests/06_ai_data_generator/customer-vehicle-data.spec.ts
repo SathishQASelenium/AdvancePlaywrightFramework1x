@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { generateTestData } from '@ai/agents/CustomDataGeneratorAgent';
 
-test('AI generates customer-vehicle data @p1 @ai', async (_, testInfo) => {
+test('AI generates customer-vehicle data @p1 @ai', async ({}, testInfo) => {
     const result = await generateTestData({
         structurePath: path.join(__dirname, '../../../testdata/structures/customer-vehicle.structure.json'),
         prompt: 'Generate one realistic customer-vehicle record. Vary all fields each time.',

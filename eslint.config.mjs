@@ -31,6 +31,8 @@ export default tseslint.config(
             globals: { ...globals.node },
         },
         rules: {
+            // Playwright test fixtures use empty destructuring {} — can't replace with _.
+            'no-empty-pattern': 'off',
             // Underscore-prefixed args/vars are intentional throwaways.
             '@typescript-eslint/no-unused-vars': [
                 'warn',
