@@ -5,6 +5,7 @@
 [![Playwright](https://img.shields.io/badge/Playwright-1.60-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Node](https://img.shields.io/badge/Node-18+-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org)
+[![Cucumber](https://img.shields.io/badge/Cucumber-13.x-23D96C?logo=cucumber&logoColor=white)](https://cucumber.io)
 [![License](https://img.shields.io/badge/License-ISC-blue.svg)]()
 
 A complete, opinionated, batteries-included Playwright framework with **Page Object Model**, **fixtures**, **data-driven testing**, **multi-env config**, **API testing**, **Winston logging**, a **custom HTML reporter**, **Allure**, and **CI-ready scripts**.
@@ -21,6 +22,7 @@ A complete, opinionated, batteries-included Playwright framework with **Page Obj
 - [Environment Configuration](#environment-configuration)
 - [Test Tags & Filtering](#test-tags--filtering)
 - [API Testing](#api-testing)
+- [Cucumber BDD Layer](#cucumber-bdd-layer)
 - [Logging (Winston)](#logging-winston)
 - [Reporting](#reporting)
 - [Framework Architecture](#framework-architecture)
@@ -59,6 +61,7 @@ A complete, opinionated, batteries-included Playwright framework with **Page Obj
 - **AI Layer** (`src/ai/`) — `LLMGateway` (multi-provider: OpenAI, Anthropic, Ollama) + `CustomDataGeneratorAgent` (LLM-driven JSON test data factory)
 - **AI-agent rule files** for Claude Code, Copilot, Cursor, Windsurf, Augment, Antigravity, Aider, Codex, Jules
 - **ESLint + Prettier + tsc** quality gates enforced on every test change
+- **Cucumber BDD** (`@cucumber/cucumber` 13.x) — Gherkin `.feature` files + `CustomWorld` + Playwright browser lifecycle via hooks; reuses all existing POM classes
 - **Docker-ready** (Dockerfile placeholder)
 
 ---
@@ -122,6 +125,17 @@ AdvancePlaywrightFramework1x/
 │       ├── DataGenerator.ts       # Faker-based test data factory
 │       ├── visualStep.ts          # Auto-screenshot step utility
 │       └── schemaValidator.ts     # Ajv wrapper — validateSchema({ valid, errors, errorText })
+│
+├── src/cucumber/              # Cucumber BDD layer
+│   ├── tsconfig.json          # CommonJS tsconfig for ts-node + path aliases
+│   ├── support/
+│   │   ├── world.ts           # CustomWorld — Browser/Page/POMs injected per scenario
+│   │   └── hooks.ts           # BeforeAll/AfterAll (browser), Before/After (context+page), screenshot on fail
+│   └── level-00-Installation/
+│       ├── feature/
+│       │   └── smoke.feature  # @level0 @smoke — standard user login scenario
+│       └── steps/
+│           └── smoke.spec.ts  # Given/When/Then step definitions for smoke feature
 │
 ├── src/ai/                    # AI layer — LLM integration
 │   ├── LLMGateway.ts          # Multi-provider LLM client (OpenAI / Anthropic / Ollama)
@@ -543,6 +557,123 @@ TTA custom HTML reporter captures every API test step, request/response details,
 - **4 steps:** Create auth token (1309ms) → Create booking to update (296ms) → PUT update booking (296ms) → Validate updated booking response (8ms)
 - **Total duration:** 2s | **Pass rate:** 100%
 - **Run date:** 17 June 2026, 11:43 PM
+
+---
+
+## Cucumber BDD Layer
+
+The framework includes a Cucumber BDD layer (`src/cucumber/`) built on `@cucumber/cucumber` 13.x. It reuses all existing Page Object Model classes, runs Playwright browser/context/page lifecycle via hooks, and keeps Gherkin specs decoupled from automation details.
+
+### Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `@cucumber/cucumber` | ^13.0.0 | BDD runner — Gherkin parser, step registry, hooks |
+| `ts-node` | ^10.9.2 | Execute TypeScript step files without precompiling |
+| `tsconfig-paths` | ^4.2.0 | Resolve path aliases (`@pages/*`, `@utils/*`, etc.) at runtime |
+
+### Folder Layout
+
+```
+src/cucumber/
+├── tsconfig.json                    # CommonJS + ts-node config; extends root tsconfig
+├── support/
+│   ├── world.ts                     # CustomWorld — exposes browser, context, page, all POM instances
+│   └── hooks.ts                     # Lifecycle hooks (BeforeAll/AfterAll/Before/After + screenshot on fail)
+└── level-00-Installation/
+    ├── feature/
+    │   └── smoke.feature            # First feature: login smoke (@level0 @smoke)
+    └── steps/
+        └── smoke.spec.ts            # Step definitions for smoke.feature
+```
+
+### CustomWorld
+
+`CustomWorld` extends `@cucumber/cucumber`'s `World` and holds every POM class instance, making them available across all step definitions via `this`:
+
+```ts
+export class CustomWorld extends World {
+    browser!: Browser;
+    context!: BrowserContext;
+    page!: Page;
+
+    loginPage!: LoginPage;
+    inventoryPage!: InventoryPage;
+    cartPage!: CartPage;
+    checkoutStepOnePage!: CheckoutStepOnePage;
+    checkoutStepTwoPage!: CheckoutStepTwoPage;
+    checkoutCompletePage!: CheckoutCompletePage;
+
+    scratch: Record<string, unknown> = {};   // cross-step shared state
+
+    initPages(): void { /* instantiates all POM classes against this.page */ }
+}
+```
+
+### Hooks
+
+| Hook | Scope | Action |
+|------|-------|--------|
+| `BeforeAll` | suite | launch Chromium (headed if `HEADED` env set) |
+| `AfterAll` | suite | close browser |
+| `Before` | scenario | new context + page + `initPages()` |
+| `After` | scenario | screenshot on failure, close page + context |
+
+Default timeout: **60 seconds** per step (`setDefaultTimeout(60_000)`).
+
+### Feature File Example
+
+```gherkin
+@level0 @smoke
+Feature: TTACart login (Level 0)
+
+  Scenario: A standard user can log in and reach the inventory
+    Given I am on the TTACart login page
+    When I log in as the standard user
+    Then the inventory page is displayed
+```
+
+### Step Definitions Example
+
+```ts
+import { Given, When, Then } from "@cucumber/cucumber";
+import { CustomWorld, CREDS } from "../../support/world";
+
+Given("I am on the TTACart login page", async function (this: CustomWorld) {
+    await this.loginPage.open();
+});
+
+When("I log in as the standard user", async function (this: CustomWorld) {
+    await this.loginPage.loginAs(CREDS.standardUser, CREDS.password);
+});
+
+Then("the inventory page is displayed", async function (this: CustomWorld) {
+    await this.inventoryPage.assertLoaded();
+});
+```
+
+### Run Cucumber Tests
+
+```bash
+# Run all features
+npx cucumber-js \
+  --require-module ts-node/register \
+  --require-module tsconfig-paths/register \
+  --require "src/cucumber/support/**/*.ts" \
+  --require "src/cucumber/**/steps/**/*.ts" \
+  "src/cucumber/**/*.feature"
+
+# Run by tag
+npx cucumber-js ... --tags "@smoke"
+npx cucumber-js ... --tags "@level0"
+
+# Headed mode
+HEADED=true npx cucumber-js ...
+```
+
+### TypeScript Config (`src/cucumber/tsconfig.json`)
+
+The Cucumber layer uses its own `tsconfig.json` (extends root) with `"module": "CommonJS"` so `ts-node` can execute step files without ESM complications. All path aliases (`@pages/*`, `@utils/*`, etc.) are resolved by `tsconfig-paths` at runtime.
 
 ---
 
