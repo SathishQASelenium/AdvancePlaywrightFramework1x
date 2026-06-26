@@ -1,15 +1,24 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
-import { CustomDataGeneratorAgent } from '@ai/agents/CustomDataGeneratorAgent';
+import * as path from 'path';
+import { generateTestData } from '@ai/agents/CustomDataGeneratorAgent';
 
 test.describe('CustomDataGeneratorAgent @p1 @ai', () => {
-    test('generates booking data from prompt and returns valid JSON path', async () => {
-        const dataPath = await CustomDataGeneratorAgent.generate('booking_prompt.md');
+    test('generates booking data from prompt and returns valid JSON path', async ({}, testInfo) => {
+        const result = await generateTestData({
+            structurePath: path.join(__dirname, '../../../testdata/structures/booking.structure.json'),
+            prompt: 'Generate one realistic hotel booking record. Vary the guest name, price (100–1000), dates, and additionalneeds each time.',
+            name: 'booking',
+        });
 
-        expect(fs.existsSync(dataPath)).toBe(true);
+        await testInfo.attach('ai-data', {
+            contentType: 'application/json',
+            body: Buffer.from(JSON.stringify(result.data, null, 2)),
+        });
 
-        const raw = fs.readFileSync(dataPath, 'utf-8');
-        const data = JSON.parse(raw) as Record<string, unknown>;
+        expect(fs.existsSync(result.filePath)).toBe(true);
+
+        const data = result.data as Record<string, unknown>;
 
         expect(data).toHaveProperty('firstname');
         expect(data).toHaveProperty('lastname');

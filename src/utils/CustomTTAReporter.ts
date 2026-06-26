@@ -83,6 +83,7 @@ class CustomTTAReporter implements Reporter {
     private testCounter: number = 0;
     private runningTests: Map<string, TestData> = new Map();
     private completedTestIds: Set<string> = new Set();
+    private aiData: { test: string; json: string }[] = [];
     private aiVerdicts: RCAResult[] = [];
     private flakyAnalysis: FlakyAnalysis | null = null;
 
@@ -284,6 +285,17 @@ class CustomTTAReporter implements Reporter {
                     tracePath = `traces/${traceName}`;
                 } catch {
                     console.warn(`Failed to copy trace: ${attachment.path}`);
+                }
+            }
+
+            if (attachment.name === 'ai-data' && attachment.contentType === 'application/json') {
+                try {
+                    const body = attachment.body
+                        ? attachment.body.toString()
+                        : attachment.path ? fs.readFileSync(attachment.path, 'utf-8') : '';
+                    if (body) this.aiData.push({ test: test.title, json: body });
+                } catch {
+                    console.warn('Failed to read ai-data attachment');
                 }
             }
         }
@@ -722,7 +734,7 @@ class CustomTTAReporter implements Reporter {
 
         <div class="tabs">
             <button class="tab-btn active" onclick="switchTab('results', this)">📊 Test Results</button>
-            <button class="tab-btn" onclick="switchTab('ai-data', this)">🤖 AI Data</button>
+            <button class="tab-btn" onclick="switchTab('ai-data', this)">🤖 AI Data${this.aiData.length ? ` (${this.aiData.length})` : ''}</button>
             <button class="tab-btn" onclick="switchTab('ai-verdict', this)">🔍 AI Verdict</button>
             <button class="tab-btn" onclick="switchTab('flaky', this)">⚡ Flaky Tests</button>
         </div>
@@ -1097,30 +1109,17 @@ class CustomTTAReporter implements Reporter {
     }
 
     private generateAIVerdictTab(): string {
-        const aiGenDir = path.resolve('src/testdata/ai-generated');
-        if (!fs.existsSync(aiGenDir)) {
-            return '<div class="ai-empty">No AI-generated data found. Run an AI data generator test first.</div>';
+        if (this.aiData.length === 0) {
+            return '<div class="ai-empty">No AI-generated data captured in this run. Run an AI data generator test first.</div>';
         }
-        const files = fs.readdirSync(aiGenDir).filter(f => f.endsWith('.json')).sort().reverse();
-        if (files.length === 0) {
-            return '<div class="ai-empty">No AI-generated data found. Run an AI data generator test first.</div>';
-        }
-        return files.map(file => {
-            try {
-                const raw = fs.readFileSync(path.join(aiGenDir, file), 'utf-8');
-                const data = JSON.parse(raw) as Record<string, unknown>;
-                const rows = Object.entries(data).map(([k, v]) => {
-                    const val = typeof v === 'object' ? JSON.stringify(v) : String(v);
-                    return `<tr><td class="ai-key">${this.escapeHtml(k)}</td><td class="ai-val">${this.escapeHtml(val)}</td></tr>`;
-                }).join('');
-                return `
-                <div class="ai-card">
-                    <div class="ai-card-header">🤖 ${this.escapeHtml(file)}</div>
-                    <table class="ai-table"><tbody>${rows}</tbody></table>
-                </div>`;
-            } catch {
-                return `<div class="ai-card ai-card-error">❌ Failed to parse ${this.escapeHtml(file)}</div>`;
-            }
+        return this.aiData.map(d => {
+            let pretty = d.json;
+            try { pretty = JSON.stringify(JSON.parse(d.json) as unknown, null, 2); } catch { /* keep raw */ }
+            return `
+            <div class="ai-card">
+                <div class="ai-card-header">🤖 ${this.escapeHtml(d.test)}</div>
+                <pre class="ai-json">${this.escapeHtml(pretty)}</pre>
+            </div>`;
         }).join('');
     }
 
@@ -1165,7 +1164,7 @@ class CustomTTAReporter implements Reporter {
             </div>
         </div>
         <div class="flaky-runs-meta">Comparing run <code>${f.run1Id}</code> vs <code>${f.run2Id}</code></div>
-        <div class="flaky-llm-summary">${this.escapeHtml(f.summary)}</div>
+        <div class="flaky-llm-summary">${this.escapeHtml(f.summary ?? '')}</div>
         <table class="flaky-table">
             <thead><tr><th></th><th>Test Name</th><th>Classification</th></tr></thead>
             <tbody>${rows}</tbody>

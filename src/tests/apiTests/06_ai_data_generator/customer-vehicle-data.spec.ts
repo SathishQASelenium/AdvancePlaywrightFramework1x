@@ -1,14 +1,24 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
-import { CustomDataGeneratorAgent } from '@ai/agents/CustomDataGeneratorAgent';
+import * as path from 'path';
+import { generateTestData } from '@ai/agents/CustomDataGeneratorAgent';
 
-test('AI generates customer-vehicle data @p1 @ai', async () => {
-    const dataPath = await CustomDataGeneratorAgent.generate('customer-vehicle_prompt.md');
+test('AI generates customer-vehicle data @p1 @ai', async ({}, testInfo) => {
+    const result = await generateTestData({
+        structurePath: path.join(__dirname, '../../../testdata/structures/customer-vehicle.structure.json'),
+        prompt: 'Generate one realistic customer-vehicle record. Vary all fields each time.',
+        name: 'customer-vehicle',
+    });
+
+    await testInfo.attach('ai-data', {
+        contentType: 'application/json',
+        body: Buffer.from(JSON.stringify(result.data, null, 2)),
+    });
 
     // file exists?
-    expect(fs.existsSync(dataPath), `File not found: ${dataPath}`).toBe(true);
+    expect(fs.existsSync(result.filePath), `File not found: ${result.filePath}`).toBe(true);
 
-    const json = JSON.parse(fs.readFileSync(dataPath, 'utf-8')) as Record<string, unknown>;
+    const json = result.data as Record<string, unknown>;
 
     // top-level keys
     expect(json).toHaveProperty('customer');
@@ -27,5 +37,5 @@ test('AI generates customer-vehicle data @p1 @ai', async () => {
     expect(vehicle).toHaveProperty('year');
     expect(vehicle).toHaveProperty('price');
 
-    console.log(`[AI Data] ${dataPath}`);
+    console.log(`[AI Data] ${result.filePath}`);
 });
