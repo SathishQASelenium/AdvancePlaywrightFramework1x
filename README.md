@@ -127,15 +127,21 @@ AdvancePlaywrightFramework1x/
 │       └── schemaValidator.ts     # Ajv wrapper — validateSchema({ valid, errors, errorText })
 │
 ├── src/cucumber/              # Cucumber BDD layer
-│   ├── tsconfig.json          # CommonJS tsconfig for ts-node + path aliases
+│   ├── tsconfig.json          # CommonJS tsconfig for ts-node + all path aliases (@ai/* etc.)
 │   ├── support/
 │   │   ├── world.ts           # CustomWorld — Browser/Page/POMs injected per scenario
-│   │   └── hooks.ts           # BeforeAll/AfterAll (browser), Before/After (context+page), screenshot on fail
-│   └── level-00-Installation/
-│       ├── feature/
-│       │   └── smoke.feature  # @level0 @smoke — standard user login scenario
+│   │   ├── hooks.ts           # BeforeAll/AfterAll (browser), Before/After (context+page), dotenv, screenshot on fail
+│   │   ├── ttaFormatter.cjs   # CJS shim — loads ttaformatter.ts via ts-node for Cucumber format array
+│   │   └── ttaformatter.ts    # TTA Cucumber formatter — bridges BDD run to CustomTTAReporter HTML pipeline
+│   ├── level-00-Installation/
+│   │   ├── feature/smoke.feature  # @level0 @smoke — standard user login scenario
+│   │   └── steps/smoke.spec.ts
+│   ├── level-01-basic/
+│   │   ├── feature/login.feature  # @level1 — login scenarios
+│   │   └── step/login.steps.ts
+│   └── level-02-data-driven/
+│       ├── feature/               # @level2 — data-driven checkout features
 │       └── steps/
-│           └── smoke.spec.ts  # Given/When/Then step definitions for smoke feature
 │
 ├── src/ai/                    # AI layer — LLM integration
 │   ├── LLMGateway.ts          # Multi-provider LLM client (OpenAI / Anthropic / Ollama)
@@ -259,6 +265,16 @@ npm run test:allure       # Allure HTML
 | `test:report` | Open Playwright HTML report |
 | `test:report:ci` | Serve report on `0.0.0.0:9323` for CI |
 | `test:allure` | Generate + open Allure HTML |
+| `test:bdd` | Run all Cucumber BDD features |
+| `test:bdd:smoke` | Run `@smoke` tagged BDD scenarios |
+| `test:bdd:report` | Open Cucumber HTML report |
+| `test:bdd:tta` | Run BDD + open TTA report |
+| `cucumber` | Alias for `cucumber-js` |
+| `cucumber:level0` | Run `@level0` scenarios headed |
+| `cucumber:level1` | Run `@level1` scenarios headed |
+| `cucumber:level2` | Run `@level2` scenarios headed |
+| `cucumber:level2:report` | Run `@level2` headed + open TTA report |
+| `cucumber:headed` | Run all BDD features in headed mode |
 | `lint` / `lint:fix` | ESLint check / fix |
 | `typecheck` | `tsc --noEmit` |
 | `format` / `format:check` | Prettier |
@@ -562,30 +578,63 @@ TTA custom HTML reporter captures every API test step, request/response details,
 
 ## Cucumber BDD Layer
 
-The framework includes a Cucumber BDD layer (`src/cucumber/`) built on `@cucumber/cucumber` 13.x. It reuses all existing Page Object Model classes, runs Playwright browser/context/page lifecycle via hooks, and keeps Gherkin specs decoupled from automation details.
+The framework includes a full Cucumber BDD layer (`src/cucumber/`) built on `@cucumber/cucumber` 13.x. It reuses all existing Page Object Model classes, runs Playwright browser/context/page lifecycle via hooks, and outputs reports through the same TTA HTML reporter as the Playwright suite.
 
 ### Dependencies
 
 | Package | Version | Purpose |
 |---------|---------|---------|
 | `@cucumber/cucumber` | ^13.0.0 | BDD runner — Gherkin parser, step registry, hooks |
-| `ts-node` | ^10.9.2 | Execute TypeScript step files without precompiling |
+| `ts-node` | ^10.9.2 | Execute TypeScript step/support files without precompiling |
 | `tsconfig-paths` | ^4.2.0 | Resolve path aliases (`@pages/*`, `@utils/*`, etc.) at runtime |
+| `cross-env` | ^10.1.0 | Cross-platform env vars (`HEADED=1`) — Windows compatible |
 
 ### Folder Layout
 
 ```
 src/cucumber/
-├── tsconfig.json                    # CommonJS + ts-node config; extends root tsconfig
+├── tsconfig.json                        # CommonJS + ts-node config; all path aliases; extends root
 ├── support/
-│   ├── world.ts                     # CustomWorld — exposes browser, context, page, all POM instances
-│   └── hooks.ts                     # Lifecycle hooks (BeforeAll/AfterAll/Before/After + screenshot on fail)
-└── level-00-Installation/
-    ├── feature/
-    │   └── smoke.feature            # First feature: login smoke (@level0 @smoke)
-    └── steps/
-        └── smoke.spec.ts            # Step definitions for smoke.feature
+│   ├── world.ts                         # CustomWorld — browser, context, page, all POM instances
+│   ├── hooks.ts                         # BeforeAll/AfterAll/Before/After + dotenv + screenshot on fail
+│   ├── ttaFormatter.cjs                 # CJS shim — loads ttaformatter.ts via ts-node
+│   └── ttaformatter.ts                  # TTA Cucumber formatter — bridges run into CustomTTAReporter
+├── level-00-Installation/
+│   ├── feature/smoke.feature            # @level0 @smoke — login smoke scenario
+│   └── steps/smoke.spec.ts
+├── level-01-basic/
+│   ├── feature/login.feature            # @level1 — login scenarios
+│   └── step/login.steps.ts
+└── level-02-data-driven/
+    ├── feature/checkout-*.feature       # @level2 — data-driven checkout flows
+    └── steps/checkout.steps.ts
 ```
+
+### Root Config — `cucumber.js`
+
+```js
+const base = {
+  requireModule: ['ts-node/register', 'tsconfig-paths/register'],
+  require: ['src/cucumber/**/*.ts'],
+  paths: ['src/cucumber/**/*.feature'],
+  format: [
+    'progress-bar',
+    'html:reports/cucumber/report.html',
+    './src/cucumber/support/ttaFormatter.cjs:tta-report/.cucumber-tta.log',
+  ],
+  formatOptions: { snippetInterface: 'async-await' },
+  publishQuiet: true,
+};
+
+module.exports = {
+  default: base,
+  level0: { ...base, tags: '@level0' },
+  level1: { ...base, tags: '@level1' },
+  level2: { ...base, tags: '@level2' },
+};
+```
+
+Profiles (`level0` / `level1` / `level2`) filter by tag. The TTA formatter is wired via the `format` array alongside the standard `html` formatter.
 
 ### CustomWorld
 
@@ -614,12 +663,44 @@ export class CustomWorld extends World {
 
 | Hook | Scope | Action |
 |------|-------|--------|
-| `BeforeAll` | suite | launch Chromium (headed if `HEADED` env set) |
+| `BeforeAll` | suite | `dotenv.config()` then launch Chromium (headed if `HEADED=1`) |
 | `AfterAll` | suite | close browser |
 | `Before` | scenario | new context + page + `initPages()` |
 | `After` | scenario | screenshot on failure, close page + context |
 
+`dotenv.config()` runs first in `hooks.ts` so `ANTHROPIC_API_KEY` and all `.env` variables are available to the RCA and FlakyAnalyzer agents during a Cucumber run.
+
 Default timeout: **60 seconds** per step (`setDefaultTimeout(60_000)`).
+
+### TTA Formatter Bridge
+
+`ttaformatter.ts` is a class-based Cucumber formatter that bridges the BDD run into the `CustomTTAReporter` HTML pipeline — producing the same branded TTA report as a Playwright run:
+
+```ts
+export default class TtaCucumberFormatter extends Formatter {
+    async finished(): Promise<void> {
+        await this.renderPromise;   // blocks Cucumber shutdown until report is written
+        await super.finished();
+    }
+
+    private async render(): Promise<void> {
+        const { tests, stats } = this.buildTests();
+        const reporter = new CustomTTAReporter();
+        const file = await reporter.renderExternalRun({
+            runId: runIdFrom(this.endTime),
+            startTime: this.startTime,
+            endTime: this.endTime,
+            tests,
+            stats,
+            meta: { browser: 'chromium (cucumber)', workers: 1 },
+        });
+    }
+}
+```
+
+- **RCA agent** fires automatically on any failed scenario (requires `ANTHROPIC_API_KEY` in `.env`)
+- **FlakyAnalyzer** runs every time, comparing the current run against previous snapshots
+- Screenshots captured during steps appear inline in the TTA report
 
 ### Feature File Example
 
@@ -655,25 +736,47 @@ Then("the inventory page is displayed", async function (this: CustomWorld) {
 ### Run Cucumber Tests
 
 ```bash
-# Run all features
-npx cucumber-js \
-  --require-module ts-node/register \
-  --require-module tsconfig-paths/register \
-  --require "src/cucumber/support/**/*.ts" \
-  --require "src/cucumber/**/steps/**/*.ts" \
-  "src/cucumber/**/*.feature"
+# Run all features (uses cucumber.js default profile)
+npm run test:bdd
 
 # Run by tag
-npx cucumber-js ... --tags "@smoke"
-npx cucumber-js ... --tags "@level0"
+npm run test:bdd:smoke
 
-# Headed mode
-HEADED=true npx cucumber-js ...
+# Run by level profile (headed, Windows-compatible via cross-env)
+npm run cucumber:level0
+npm run cucumber:level1
+npm run cucumber:level2
+
+# Run level2 and open TTA report automatically
+npm run cucumber:level2:report
+
+# Open Cucumber HTML report
+npm run test:bdd:report
 ```
+
+### Latest Cucumber BDD Run — TTA Report
+
+![Cucumber BDD TTA Report](docs/images/Cucumber-BDD-TTA-Report-06-30-2026.png)
+
+- **9/9 scenarios passed** — 100% pass rate, 28s total duration
+- **Browser:** `CHROMIUM (CUCUMBER)` — Playwright browser via `CustomWorld`
+- **Platform:** Windows | **Workers:** 1 | **Run ID:** `20260630_083047`
+- **FlakyAnalyzer** ran: 0 flaky, 0 failing detected across runs
+- **RCA Agent** ready: fires automatically on any future failure if `ANTHROPIC_API_KEY` is set
+- **Report location:** `tta-report/index.html` (auto-opens via `npm run cucumber:level2:report`)
+- **Run date:** 30 June 2026, 08:30 AM
 
 ### TypeScript Config (`src/cucumber/tsconfig.json`)
 
-The Cucumber layer uses its own `tsconfig.json` (extends root) with `"module": "CommonJS"` so `ts-node` can execute step files without ESM complications. All path aliases (`@pages/*`, `@utils/*`, etc.) are resolved by `tsconfig-paths` at runtime.
+The Cucumber layer uses its own `tsconfig.json` (extends root) with `"module": "CommonJS"` so `ts-node` can execute step files without ESM complications. All path aliases (`@pages/*`, `@utils/*`, `@ai/*`, etc.) are declared explicitly so `tsconfig-paths` resolves them at runtime in the Cucumber process (which never loads `playwright.config.ts`).
+
+### Windows Compatibility
+
+| Issue | Fix |
+|-------|-----|
+| `HEADED=1 cucumber-js` fails on Windows cmd | `cross-env HEADED=1 cucumber-js` |
+| `open tta-report/index.html` (Mac-only) | `cmd /c start "" tta-report/index.html` |
+| `.env` not loaded (no `playwright.config.ts`) | `dotenv.config()` at top of `hooks.ts` |
 
 ---
 

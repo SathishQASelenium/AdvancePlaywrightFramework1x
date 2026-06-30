@@ -21,7 +21,7 @@ import { RCAAgent, RCAResult } from '@ai/agents/RCAAgent';
 import { FlakyTestAnalyzerAgent, FlakyAnalysis } from '@ai/agents/FlakyTestAnalyzerAgent';
 import { hasApiKey } from '@ai/config/providers';
 
-interface StepData {
+export interface StepData {
     title: string;
     category: string;
     duration: number;
@@ -36,7 +36,7 @@ interface StepData {
     videoEndTime?: number;
 }
 
-interface TestData {
+export interface TestData {
     id: string;
     title: string;
     fullTitle: string;
@@ -48,6 +48,7 @@ interface TestData {
     retry: number;
     screenshots: { name: string; path: string }[];
     steps: StepData[];
+    logs?: string[];
     video?: string;
     trace?: string;
     error?: string;
@@ -61,7 +62,7 @@ interface FileGroup {
     stats: { passed: number; failed: number; skipped: number; total: number };
 }
 
-interface SuiteStats {
+export interface SuiteStats {
     total: number;
     passed: number;
     failed: number;
@@ -73,7 +74,8 @@ class CustomTTAReporter implements Reporter {
     private testResults: TestData[] = [];
     private fileGroups: Map<string, FileGroup> = new Map();
     private suiteStats: SuiteStats = { total: 0, passed: 0, failed: 0, skipped: 0, flaky: 0 };
-    private config!: FullConfig;
+    private config?: FullConfig;
+    private reportMeta?: { browser?: string; workers?: number };
     private startTime: Date = new Date();
     private endTime: Date = new Date();
     private outputFile: string = 'tta-report/index.html';
@@ -469,6 +471,58 @@ class CustomTTAReporter implements Reporter {
         console.log(`✅ Report generated: ${this.outputFile}`);
     }
 
+    /**
+     * Render a TTA report from an external run (e.g. Cucumber) that does not
+     * go through Playwright Reporter callbacks. The caller builds TestData[] /
+     * SuiteStats from its own event stream and we reuse the same HTML pipeline.
+     *
+     * @returns path of the generated report file.
+     */
+    async renderExternalRun(input: {
+        runId: string;
+        startTime: Date;
+        endTime: Date;
+        tests: TestData[];
+        stats: SuiteStats;
+        meta?: { browser?: string; workers?: number };
+    }): Promise<string> {
+        this.runId = input.runId;
+        this.outputFile = `tta-report/report_${input.runId}.html`;
+        this.startTime = input.startTime;
+        this.endTime = input.endTime;
+        this.testResults = input.tests;
+        this.suiteStats = input.stats;
+        this.reportMeta = input.meta;
+
+        // RCA for failures
+        const failedTests = input.tests.filter(t => t.status === 'failed' || t.status === 'timedOut');
+        if (failedTests.length > 0 && hasApiKey()) {
+            console.log(`\n🤖 RCA Agent analysing ${failedTests.length} failure(s)...`);
+            for (const t of failedTests) {
+                try {
+                    const rca = await RCAAgent.analyse(t.title, t.error ?? 'Unknown error', t.errorStack ?? '', t.file);
+                    this.aiVerdicts.push(rca);
+                } catch (e) {
+                    console.warn(`   ⚠️  RCA failed for "${t.title}": ${e}`);
+                }
+            }
+        }
+
+        // Flaky analysis
+        FlakyTestAnalyzerAgent.saveSnapshot(
+            this.runId,
+            input.tests.map(t => ({ title: t.title, file: t.file, status: t.status })),
+        );
+        try {
+            this.flakyAnalysis = await FlakyTestAnalyzerAgent.analyse();
+        } catch {
+            // non-fatal
+        }
+
+        await this.generateReport();
+        return this.outputFile;
+    }
+
     private formatTime(date: Date): string {
         return date.toLocaleString('en-US', {
             month: 'short',
@@ -709,7 +763,7 @@ class CustomTTAReporter implements Reporter {
     }
 
     private generateHTML(): string {
-        const browserName = this.config.projects[0]?.name || 'chrome';
+        const browserName = this.config?.projects[0]?.name || this.reportMeta?.browser || 'chrome';
         const platform = process.platform === 'darwin' ? 'Mac' : process.platform === 'win32' ? 'Windows' : 'Linux';
 
         return `<!DOCTYPE html>
@@ -826,7 +880,7 @@ class CustomTTAReporter implements Reporter {
             </div>
             <div class="meta-item">
                 <span class="meta-label">Workers</span>
-                <span class="meta-value">${this.config.workers || 1}</span>
+                <span class="meta-value">${this.config?.workers ?? this.reportMeta?.workers ?? 1}</span>
             </div>
             <div class="meta-item">
                 <span class="meta-label">Run ID</span>
